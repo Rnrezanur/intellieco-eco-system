@@ -1,0 +1,302 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="dashboard-page">
+  <%- include("../partials/flash") %>
+
+  <section class="dashboard-header">
+    <div>
+      <span class="eyebrow">Welcome back</span>
+      <h1><%= currentUser.name %>'s Dashboard</h1>
+      <p>Upload or capture a waste image, request pickup, and earn rewards for completed waste collections.</p>
+    </div>
+    <div class="tip-card">
+      <div class="model-card-header">
+        <div>
+          <h2>Your Rewards</h2>
+          <p class="panel-subtitle">You earn points when your waste pickup is completed.</p>
+        </div>
+        <span class="status-badge reward-badge"><%= rewardSummary.points %> pts</span>
+      </div>
+      <div class="model-card-grid">
+        <div class="model-card-item">
+          <span>Total Reward Points</span>
+          <strong id="rewardPointsTotal"><%= rewardSummary.points %></strong>
+        </div>
+        <div class="model-card-item">
+          <span>Rewarded Pickups</span>
+          <strong id="rewardedPickupTotal"><%= rewardSummary.rewardedPickups %></strong>
+        </div>
+      </div>
+      <p class="tip-copy">
+        Reward points are added after the admin marks your pickup as completed.
+      </p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>Waste Model Status</h2>
+        <p class="panel-subtitle">The app uses your custom TensorFlow.js model when available.</p>
+      </div>
+      <span class="status-badge" id="modelModeBadge">Checking...</span>
+    </div>
+    <div class="model-card-grid model-status-grid">
+      <div class="model-card-item">
+        <span>Version</span>
+        <strong><%= modelConfig.version %></strong>
+      </div>
+      <div class="model-card-item">
+        <span>Fallback</span>
+        <strong id="modelFallbackText">Waiting</strong>
+      </div>
+    </div>
+    <p class="tip-copy">
+      If your custom model files are missing, IntelliEco switches to a visible demo mode so waste
+      detection still works while you build the real classifier.
+    </p>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <h2>Waste Detection</h2>
+      <p class="panel-subtitle">Use file upload or your device camera.</p>
+
+      <form id="detectionForm" class="detection-form">
+        <label>
+          Upload Image
+          <input type="file" id="wasteImage" name="wasteImage" accept="image/*" required />
+        </label>
+
+        <div class="camera-actions">
+          <button type="button" id="startCameraBtn" class="button button-secondary">
+            Capture With Camera
+          </button>
+          <button type="button" id="takeSnapshotBtn" class="ghost-button" disabled>
+            Take Snapshot
+          </button>
+        </div>
+
+        <video id="cameraFeed" autoplay playsinline class="camera-feed hidden"></video>
+        <canvas id="snapshotCanvas" class="hidden"></canvas>
+        <img id="previewImage" class="preview-image hidden" alt="Selected waste preview" />
+
+        <button type="submit" class="button" id="analyzeBtn">Analyze Waste</button>
+        <p id="modelStatus" class="status-text">Loading custom waste model...</p>
+      </form>
+    </article>
+
+    <article class="panel result-panel">
+      <h2>Detection Result</h2>
+      <div id="resultCard" class="result-card empty">
+        <p>Upload or capture an image to see the predicted waste category.</p>
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-alt">
+    <article class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>Your Waste Statistics</h2>
+          <p class="panel-subtitle">Track which waste categories you detect most often.</p>
+        </div>
+        <div class="stat-pill" id="totalDetectionsPill">0 total scans</div>
+      </div>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <canvas id="wasteBreakdownChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <canvas id="wasteTrendChart"></canvas>
+        </div>
+      </div>
+    </article>
+
+    <article class="panel finder-panel">
+      <div class="finder-top">
+        <div>
+          <h2>Find Recycling Centers</h2>
+          <p class="panel-subtitle">Search an area to show a map and nearby recycling centers.</p>
+        </div>
+      </div>
+
+      <form id="locationForm" class="finder-search">
+        <div class="finder-search-field">
+          <label for="locationInput">Area</label>
+          <input
+            type="text"
+            id="locationInput"
+            placeholder="Example: Kuril, Dhaka"
+            required
+          />
+        </div>
+        <button type="submit" class="button">Search Map</button>
+      </form>
+
+      <div class="finder-status-shell">
+        <p id="mapStatus" class="status-text finder-status">
+          Search an area to show nearby recycling centers and their locations on the map.
+        </p>
+      </div>
+
+      <div id="finderResults" class="finder-results hidden">
+        <div class="finder-map-wrap">
+          <div id="recyclingMap" class="map-box"></div>
+        </div>
+        <div class="finder-actions hidden" id="finderActions">
+          <button type="button" id="seeAllCentersBtn" class="ghost-button">See All Centers</button>
+        </div>
+        <div id="recyclingList" class="recycling-list"></div>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>Request Waste Pickup</h2>
+        <p class="panel-subtitle">Share your waste and address so the admin can arrange pickup and reward you after completion.</p>
+      </div>
+    </div>
+    <form id="pickupRequestForm" class="pickup-form">
+      <div class="pickup-grid">
+        <label>
+          Waste Type
+          <input type="text" id="pickupWasteType" placeholder="Example: Plastic bottles" required />
+        </label>
+        <label>
+          Contact Phone
+          <input type="text" id="pickupPhone" placeholder="Example: 01XXXXXXXXX" required />
+        </label>
+      </div>
+      <label>
+        Area / Location Name
+        <input type="text" id="pickupArea" value="Kuril, Dhaka" required />
+      </label>
+      <label>
+        Full Address
+        <input type="text" id="pickupAddress" placeholder="House, road, landmark" required />
+      </label>
+      <div class="pickup-grid">
+        <label>
+          Latitude
+          <input type="text" id="pickupLatitude" placeholder="Optional" />
+        </label>
+        <label>
+          Longitude
+          <input type="text" id="pickupLongitude" placeholder="Optional" />
+        </label>
+      </div>
+      <label>
+        Notes
+        <input type="text" id="pickupNotes" placeholder="Optional note for pickup team" />
+      </label>
+      <button type="submit" class="button">Submit Pickup Request</button>
+      <p id="pickupStatus" class="status-text">Submit your location to request pickup. Rewards appear after pickup is completed.</p>
+    </form>
+
+    <div class="table-wrapper">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Waste Type</th>
+            <th>Area</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Reward</th>
+            <th>Assigned To</th>
+            <th>Date & Time</th>
+          </tr>
+        </thead>
+        <tbody id="pickupHistoryBody">
+          <% if (pickupRequests.length === 0) { %>
+            <tr>
+              <td colspan="7">No pickup requests yet.</td>
+            </tr>
+          <% } %>
+          <% pickupRequests.forEach((item) => { %>
+            <tr>
+              <td><%= item.wasteType %></td>
+              <td><%= item.areaName %></td>
+              <td><%= item.contactPhone %></td>
+              <td><%= item.status %></td>
+              <td><%= item.rewardStatus === "earned" ? `${item.rewardPoints} pts` : "Pending" %></td>
+              <td><%= item.assignedTo || "Not assigned" %></td>
+              <td><%= new Date(item.createdAt).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="history-header">
+      <h2>Detection History</h2>
+      <p>Each analysis is stored with the image, waste type, and timestamp.</p>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Waste Type</th>
+            <th>Model Version</th>
+            <th>Confidence</th>
+            <th>Suggestion</th>
+            <th>Date & Time</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <% if (history.length === 0) { %>
+            <tr>
+              <td colspan="6">No detections yet.</td>
+            </tr>
+          <% } %>
+          <% history.forEach((item) => { %>
+            <tr>
+              <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
+              <td><%= item.wasteType %></td>
+              <td><%= item.modelVersion || "1.0.0" %></td>
+              <td><%= item.confidence ? `${(item.confidence * 100).toFixed(1)}%` : "N/A" %></td>
+              <td><%= item.suggestion %></td>
+              <td><%= new Date(item.createdAt).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="centersModal" class="centers-modal hidden">
+  <div class="centers-modal-backdrop" id="centersModalBackdrop"></div>
+  <div class="centers-modal-card">
+    <div class="centers-modal-header">
+      <div>
+        <h2>All Recycling Centers</h2>
+        <p class="panel-subtitle" id="centersModalSubtitle">Search an area to see all centers.</p>
+      </div>
+      <button type="button" id="closeCentersModalBtn" class="ghost-button">Close</button>
+    </div>
+    <div id="centersModalList" class="centers-modal-list"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+  crossorigin=""
+></script>
+<script>
+  window.intelliEcoModelConfig = <%- JSON.stringify(modelConfig) %>;
+</script>
+<script src="/js/dashboard.js"></script>
+
+<%- include("../partials/footer") %>

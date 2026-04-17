@@ -1,0 +1,29 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="auth-page">
+  <%- include("../partials/flash") %>
+
+  <section class="auth-card">
+    <h1>Login</h1>
+    <p>Only verified users can access the dashboard.</p>
+
+    <form action="/auth/login" method="POST" class="auth-form">
+      <label>
+        Email
+        <input type="email" name="email" required />
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" minlength="6" required />
+      </label>
+      <button type="submit" class="button">Login</button>
+    </form>
+
+    <p class="helper-link"><a href="/forgot-password">Forgot your password?</a></p>
+    <p class="helper-link"><a href="/verify-account">Verify your account</a></p>
+    <p class="helper-link">New here? <a href="/register">Create an account</a></p>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

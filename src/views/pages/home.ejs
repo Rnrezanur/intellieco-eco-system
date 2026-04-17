@@ -1,0 +1,47 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="hero-page">
+  <%- include("../partials/flash") %>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="eyebrow">AI-Powered Recycling Support</span>
+      <h1>Identify waste, get recycling tips, and build eco-friendly habits.</h1>
+      <p>
+        IntelliEco is a simple web app that helps users detect common waste types
+        from images and see what to do next.
+      </p>
+      <div class="hero-actions">
+        <a href="/register" class="button">Get Started</a>
+        <a href="/login" class="button button-secondary">Login</a>
+      </div>
+    </div>
+    <div class="hero-card">
+      <h2>What the app does</h2>
+      <ul class="feature-list">
+        <li>Secure sign-up and email verification</li>
+        <li>Upload or capture waste images</li>
+        <li>AI-assisted category prediction</li>
+        <li>Recycling suggestions and history tracking</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="info-grid">
+    <article class="info-card">
+      <h3>Plastic</h3>
+      <p>Learn whether the object should go into a plastic recycling bin.</p>
+    </article>
+    <article class="info-card">
+      <h3>Metal</h3>
+      <p>Get helpful guidance for cans and metal containers.</p>
+    </article>
+    <article class="info-card">
+      <h3>Organic</h3>
+      <p>See compost-friendly advice for food and plant waste.</p>
+    </article>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

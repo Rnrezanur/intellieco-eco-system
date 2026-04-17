@@ -1,0 +1,283 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="dashboard-page">
+  <%- include("../partials/flash") %>
+
+  <section class="dashboard-header">
+    <div>
+      <span class="eyebrow">Admin Overview</span>
+      <h1>IntelliEco Control Panel</h1>
+      <p>Review users, waste trends, and recent detections across the whole platform.</p>
+    </div>
+    <div class="tip-card">
+      <h2>Admin Actions</h2>
+      <p>Use this panel to monitor activity and verify that your custom waste model is classifying expected categories.</p>
+    </div>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric-card">
+      <span>Total Users</span>
+      <strong id="adminTotalUsers"><%= users.length %></strong>
+    </article>
+    <article class="metric-card">
+      <span>Verified Users</span>
+      <strong id="adminVerifiedUsers">0</strong>
+    </article>
+    <article class="metric-card">
+      <span>Total Detections</span>
+      <strong id="adminTotalDetections"><%= recentDetections.length %></strong>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-alt">
+    <article class="panel">
+      <h2>Platform Waste Breakdown</h2>
+      <div class="chart-card">
+        <canvas id="adminWasteChart"></canvas>
+      </div>
+    </article>
+    <article class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>Reports</h2>
+          <p class="panel-subtitle">Download platform waste activity as CSV or PDF.</p>
+        </div>
+      </div>
+      <div class="report-actions">
+        <a href="/admin/reports/csv" class="button button-secondary">Download CSV</a>
+        <a href="/admin/reports/pdf" class="button">Download PDF</a>
+      </div>
+      <div class="chart-card">
+        <canvas id="adminVersionChart"></canvas>
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-alt">
+    <article class="panel">
+      <h2>Pickup Requests</h2>
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Waste</th>
+              <th>Area</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Assign</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="pickupRequestTableBody">
+            <% if (pickupRequests.length === 0) { %>
+              <tr>
+                <td colspan="7">No pickup requests yet.</td>
+              </tr>
+            <% } %>
+            <% pickupRequests.forEach((pickup) => { %>
+              <tr data-pickup-id="<%= pickup._id %>">
+                <td><%= pickup.user?.email || "Unknown user" %></td>
+                <td><%= pickup.wasteType %></td>
+                <td><%= pickup.areaName %><br /><span class="status-text"><%= pickup.addressLine %></span></td>
+                <td><%= pickup.contactPhone %></td>
+                <td>
+                  <select class="pickup-status-select">
+                    <% ["pending", "assigned", "picked_up"].forEach((status) => { %>
+                      <option value="<%= status %>" <%= pickup.status === status ? "selected" : "" %>><%= status %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td>
+                  <input type="text" class="pickup-assignee-input" value="<%= pickup.assignedTo || "" %>" placeholder="Delivery person" />
+                </td>
+                <td>
+                  <button type="button" class="ghost-button save-pickup-btn">Save Pickup</button>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-alt">
+    <article class="panel">
+      <h2>Scheduled Email Reports</h2>
+      <div class="schedule-stack">
+        <% reportSchedules.forEach((schedule) => { %>
+          <form class="schedule-form" data-frequency="<%= schedule.frequency %>">
+            <div class="section-heading">
+              <div>
+                <h3><%= schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1) %> Report</h3>
+                <p class="panel-subtitle"><%= schedule.nextRunLabel || "Scheduled run" %></p>
+              </div>
+              <label class="toggle-label">
+                <input type="checkbox" class="schedule-active" <%= schedule.isActive ? "checked" : "" %> />
+                Active
+              </label>
+            </div>
+            <label>
+              Recipients
+              <input
+                type="text"
+                class="schedule-recipients"
+                value="<%= schedule.recipients.join(", ") %>"
+                placeholder="admin@example.com, team@example.com"
+              />
+            </label>
+            <button type="submit" class="button button-secondary">Save Schedule</button>
+          </form>
+        <% }) %>
+      </div>
+    </article>
+    <article class="panel">
+      <h2>Audit Logs</h2>
+      <div id="auditLogList" class="audit-log-list">
+        <% auditLogs.forEach((log) => { %>
+          <article class="audit-card">
+            <strong><%= log.actionType %></strong>
+            <p><%= log.adminUser?.email || "Unknown admin" %> acted on <%= log.targetType %></p>
+            <p><%= new Date(log.createdAt).toLocaleString() %></p>
+          </article>
+        <% }) %>
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid dashboard-grid-alt">
+    <article class="panel">
+      <h2>Role Management</h2>
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Verified</th>
+              <th>Joined</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="userRoleTableBody">
+            <% users.forEach((user) => { %>
+              <tr data-user-id="<%= user._id %>">
+                <td><%= user.name %></td>
+                <td><%= user.email %></td>
+                <td>
+                  <select class="role-select" <%= String(user._id) === String(currentUser.id) ? "disabled" : "" %>>
+                    <option value="user" <%= user.role === "user" ? "selected" : "" %>>user</option>
+                    <option value="admin" <%= user.role === "admin" ? "selected" : "" %>>admin</option>
+                  </select>
+                </td>
+                <td><%= user.isVerified ? "Yes" : "No" %></td>
+                <td><%= new Date(user.createdAt).toLocaleString() %></td>
+                <td>
+                  <% if (String(user._id) === String(currentUser.id)) { %>
+                    <span class="status-text">Current account</span>
+                  <% } else { %>
+                    <button type="button" class="ghost-button save-role-btn">Save Role</button>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+    <article class="panel">
+      <h2>Model Version Performance</h2>
+      <div class="table-wrapper">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Detections</th>
+              <th>Average Confidence</th>
+            </tr>
+          </thead>
+          <tbody id="modelVersionBody">
+            <tr>
+              <td colspan="3">Loading model version data...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>Recent Detections</h2>
+        <p class="panel-subtitle">Review corrections to compare predicted and manually confirmed waste types.</p>
+      </div>
+      <div id="reviewSummaryPill" class="stat-pill">Loading review status...</div>
+    </div>
+    <div class="table-wrapper">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Class Label</th>
+            <th>Model Version</th>
+            <th>Waste Type</th>
+            <th>Review</th>
+            <th>Confidence</th>
+            <th>Date & Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (recentDetections.length === 0) { %>
+            <tr>
+              <td colspan="7">No detections yet.</td>
+            </tr>
+          <% } %>
+          <% recentDetections.forEach((item) => { %>
+            <tr data-detection-id="<%= item._id %>">
+              <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
+              <td><%= item.predictedLabel %></td>
+              <td><%= item.modelVersion || "1.0.0" %></td>
+              <td><%= item.wasteType %></td>
+              <td>
+                <form class="review-form">
+                  <select class="review-select">
+                    <% ["Plastic", "Metal", "Paper", "Organic", "Glass", "Unknown"].forEach((type) => { %>
+                      <option
+                        value="<%= type %>"
+                        <%= (item.reviewedWasteType || item.wasteType) === type ? "selected" : "" %>
+                      >
+                        <%= type %>
+                      </option>
+                    <% }) %>
+                  </select>
+                  <input
+                    type="text"
+                    class="review-note"
+                    value="<%= item.reviewNote || "" %>"
+                    placeholder="Optional note"
+                  />
+                  <button type="submit" class="ghost-button">Save Review</button>
+                  <p class="status-text">
+                    <%= item.reviewStatus === "corrected" ? `Corrected to ${item.reviewedWasteType} by ${item.reviewedBy?.email || item.reviewedBy?.name || "admin"}` : "Not reviewed yet" %>
+                  </p>
+                </form>
+              </td>
+              <td><%= item.confidence ? `${(item.confidence * 100).toFixed(1)}%` : "N/A" %></td>
+              <td><%= new Date(item.createdAt).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/js/admin.js"></script>
+
+<%- include("../partials/footer") %>

@@ -1,0 +1,366 @@
+let adminWasteChart = null;
+let adminVersionChart = null;
+
+async function fetchAdminStats() {
+  try {
+    const response = await fetch("/admin/stats");
+    const stats = await response.json();
+
+    if (!response.ok) {
+      throw new Error(stats.message || "Could not load admin statistics.");
+    }
+
+    document.getElementById("adminTotalUsers").textContent = stats.totalUsers;
+    document.getElementById("adminVerifiedUsers").textContent = stats.verifiedUsers;
+    document.getElementById("adminTotalDetections").textContent = stats.totalDetections;
+    updateReviewSummary(stats.reviewSummary);
+
+    renderAdminChart(stats.wasteBreakdown);
+    renderVersionChart(stats.versionBreakdown);
+    renderVersionTable(stats.versionBreakdown);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function renderAdminChart(entries) {
+  const context = document.getElementById("adminWasteChart");
+  if (!context) {
+    return;
+  }
+
+  if (adminWasteChart) {
+    adminWasteChart.destroy();
+  }
+
+  adminWasteChart = new Chart(context, {
+    type: "bar",
+    data: {
+      labels: entries.map((entry) => entry._id),
+      datasets: [
+        {
+          label: "Detections",
+          data: entries.map((entry) => entry.total),
+          backgroundColor: ["#2f8f5b", "#4db08a", "#7dc98e", "#f4b860", "#5db2d6", "#d6dde1"]
+        }
+      ]
+    },
+    options: {
+      plugins: {
+        legend: {
+          display: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderVersionChart(entries) {
+  const context = document.getElementById("adminVersionChart");
+  if (!context) {
+    return;
+  }
+
+  if (adminVersionChart) {
+    adminVersionChart.destroy();
+  }
+
+  adminVersionChart = new Chart(context, {
+    type: "line",
+    data: {
+      labels: entries.map((entry) => entry._id || "unknown"),
+      datasets: [
+        {
+          label: "Detections",
+          data: entries.map((entry) => entry.total),
+          borderColor: "#2f8f5b",
+          backgroundColor: "rgba(47, 143, 91, 0.12)",
+          yAxisID: "y",
+          tension: 0.3
+        },
+        {
+          label: "Average Confidence",
+          data: entries.map((entry) => Number((entry.averageConfidence || 0).toFixed(3))),
+          borderColor: "#f4b860",
+          backgroundColor: "rgba(244, 184, 96, 0.15)",
+          yAxisID: "y1",
+          tension: 0.3
+        }
+      ]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          position: "left"
+        },
+        y1: {
+          beginAtZero: true,
+          position: "right",
+          max: 1,
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderVersionTable(entries) {
+  const container = document.getElementById("modelVersionBody");
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = entries
+    .map(
+      (entry) => `
+        <tr>
+          <td>${entry._id || "unknown"}</td>
+          <td>${entry.total}</td>
+          <td>${((entry.averageConfidence || 0) * 100).toFixed(1)}%</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function updateReviewSummary(entries) {
+  const pill = document.getElementById("reviewSummaryPill");
+  if (!pill) {
+    return;
+  }
+
+  const corrected = entries.find((entry) => entry._id === "corrected")?.total || 0;
+  const pending = entries.find((entry) => entry._id === "pending")?.total || 0;
+  pill.textContent = `${corrected} corrected, ${pending} pending`;
+}
+
+async function saveSchedule(frequency, recipients, isActive) {
+  const response = await fetch(`/admin/report-schedules/${frequency}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ recipients, isActive })
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Could not update report schedule.");
+  }
+
+  return result;
+}
+
+async function saveReview(detectionId, reviewedWasteType, reviewNote) {
+  const response = await fetch(`/api/detections/${detectionId}/review`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ reviewedWasteType, reviewNote })
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Could not save detection review.");
+  }
+
+  return result;
+}
+
+async function refreshAuditLogs() {
+  const container = document.getElementById("auditLogList");
+  if (!container) {
+    return;
+  }
+
+  try {
+    const response = await fetch("/admin/audit-logs");
+    const logs = await response.json();
+    if (!response.ok) {
+      throw new Error("Could not load audit logs.");
+    }
+
+    container.innerHTML = logs
+      .map(
+        (log) => `
+          <article class="audit-card">
+            <strong>${log.actionType}</strong>
+            <p>${log.adminUser?.email || "Unknown admin"} acted on ${log.targetType}</p>
+            <p>${new Date(log.createdAt).toLocaleString()}</p>
+          </article>
+        `
+      )
+      .join("");
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+async function updateRole(userId, role) {
+  const response = await fetch(`/admin/users/${userId}/role`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ role })
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Could not update role.");
+  }
+
+  return result;
+}
+
+async function updatePickupRequest(pickupId, status, assignedTo) {
+  const response = await fetch(`/api/pickup-requests/${pickupId}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ status, assignedTo })
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Could not update pickup request.");
+  }
+
+  return result;
+}
+
+document.querySelectorAll(".save-role-btn").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const row = button.closest("tr");
+    const userId = row?.dataset.userId;
+    const role = row?.querySelector(".role-select")?.value;
+
+    if (!userId || !role) {
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+      await updateRole(userId, role);
+      button.textContent = "Saved";
+      setTimeout(() => {
+        button.textContent = "Save Role";
+        button.disabled = false;
+      }, 1200);
+      fetchAdminStats();
+      refreshAuditLogs();
+    } catch (error) {
+      console.error(error);
+      button.textContent = "Retry";
+      button.disabled = false;
+    }
+  });
+});
+
+document.querySelectorAll(".schedule-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const frequency = form.dataset.frequency;
+    const recipients = form.querySelector(".schedule-recipients")?.value || "";
+    const isActive = form.querySelector(".schedule-active")?.checked || false;
+    const button = form.querySelector("button");
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+      await saveSchedule(frequency, recipients, isActive);
+      button.textContent = "Saved";
+      setTimeout(() => {
+        button.textContent = "Save Schedule";
+        button.disabled = false;
+      }, 1200);
+      refreshAuditLogs();
+    } catch (error) {
+      console.error(error);
+      button.textContent = "Retry";
+      button.disabled = false;
+    }
+  });
+});
+
+document.querySelectorAll(".review-form").forEach((form) => {
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const row = form.closest("tr");
+    const detectionId = row?.dataset.detectionId;
+    const reviewedWasteType = form.querySelector(".review-select")?.value;
+    const reviewNote = form.querySelector(".review-note")?.value || "";
+    const button = form.querySelector("button");
+    const status = form.querySelector(".status-text");
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+      const result = await saveReview(detectionId, reviewedWasteType, reviewNote);
+      status.textContent = `Corrected to ${result.detection.reviewedWasteType}`;
+      button.textContent = "Saved";
+      setTimeout(() => {
+        button.textContent = "Save Review";
+        button.disabled = false;
+      }, 1200);
+      fetchAdminStats();
+      refreshAuditLogs();
+    } catch (error) {
+      console.error(error);
+      button.textContent = "Retry";
+      button.disabled = false;
+    }
+  });
+});
+
+document.querySelectorAll(".save-pickup-btn").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const row = button.closest("tr");
+    const pickupId = row?.dataset.pickupId;
+    const status = row?.querySelector(".pickup-status-select")?.value;
+    const assignedTo = row?.querySelector(".pickup-assignee-input")?.value || "";
+
+    if (!pickupId) {
+      return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+
+    try {
+      const result = await updatePickupRequest(pickupId, status, assignedTo);
+      button.textContent = result.reward ? `Saved + ${result.reward.points} pts` : "Saved";
+      setTimeout(() => {
+        button.textContent = "Save Pickup";
+        button.disabled = false;
+      }, 1200);
+      refreshAuditLogs();
+    } catch (error) {
+      console.error(error);
+      button.textContent = "Retry";
+      button.disabled = false;
+    }
+  });
+});
+
+fetchAdminStats();
+refreshAuditLogs();

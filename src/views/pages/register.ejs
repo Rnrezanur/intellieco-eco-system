@@ -1,0 +1,32 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="auth-page">
+  <%- include("../partials/flash") %>
+
+  <section class="auth-card">
+    <h1>Create Account</h1>
+    <p>Sign up to start tracking your waste detection history.</p>
+
+    <form action="/auth/signup" method="POST" class="auth-form">
+      <label>
+        Name
+        <input type="text" name="name" required />
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" required />
+      </label>
+      <label>
+        Password
+        <input type="password" name="password" minlength="6" required />
+      </label>
+      <button type="submit" class="button">Register</button>
+    </form>
+
+    <p class="helper-link">Already have an account? <a href="/login">Login here</a></p>
+    <p class="helper-link">Need to activate your account? <a href="/verify-account">Verify here</a></p>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>
