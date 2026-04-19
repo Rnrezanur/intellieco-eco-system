@@ -181,6 +181,10 @@ img {
   gap: 1rem;
 }
 
+.detection-form {
+  gap: 0.8rem;
+}
+
 label {
   display: grid;
   gap: 0.45rem;
@@ -232,6 +236,10 @@ input {
   grid-template-columns: 1.2fr 0.8fr;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.dashboard-grid > .panel {
+  padding: 1.15rem;
 }
 
 .dashboard-grid-alt {
@@ -596,11 +604,17 @@ input {
 .camera-feed,
 .preview-image {
   width: 100%;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px solid var(--border);
   background: #dfece1;
-  min-height: 220px;
+  min-height: 180px;
   object-fit: cover;
+}
+
+.detection-form .preview-image {
+  max-height: 320px;
+  object-fit: contain;
+  background: #ffffff;
 }
 
 .hidden {
@@ -608,13 +622,24 @@ input {
 }
 
 .result-card {
-  min-height: 260px;
+  min-height: 0;
   background: var(--surface-2);
-  border-radius: 20px;
-  padding: 1.25rem;
+  border-radius: 18px;
+  padding: 1rem;
   display: grid;
   align-content: start;
-  gap: 0.85rem;
+  gap: 0.55rem;
+}
+
+.result-card p {
+  margin: 0.2rem 0;
+}
+
+.result-card .preview-image {
+  min-height: 0;
+  max-height: 190px;
+  object-fit: contain;
+  background: #ffffff;
 }
 
 .result-card.empty {

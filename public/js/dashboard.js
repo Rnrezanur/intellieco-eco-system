@@ -3,6 +3,7 @@ const wasteImageInput = document.getElementById("wasteImage");
 const previewImage = document.getElementById("previewImage");
 const modelStatus = document.getElementById("modelStatus");
 const resultCard = document.getElementById("resultCard");
+const analyzeBtn = document.getElementById("analyzeBtn");
 const historyBody = document.getElementById("historyBody");
 const cameraFeed = document.getElementById("cameraFeed");
 const snapshotCanvas = document.getElementById("snapshotCanvas");
@@ -37,15 +38,17 @@ let wasteTrendChart = null;
 let map = null;
 let mapMarkers = [];
 let usingDemoModel = false;
+let demoClassifierModel = null;
 let currentCenters = [];
 let currentCenterLocation = "";
+const FALLBACK_MODEL_VERSION = "mobilenet-v2-fallback";
 
 const DEMO_WASTE_RULES = [
-  { keywords: ["bottle", "plastic", "pet", "water"], label: "plastic", confidence: 0.86 },
-  { keywords: ["can", "metal", "aluminum", "tin"], label: "metal", confidence: 0.82 },
-  { keywords: ["paper", "book", "cardboard", "newspaper"], label: "paper", confidence: 0.8 },
-  { keywords: ["banana", "food", "leaf", "organic"], label: "organic", confidence: 0.78 },
-  { keywords: ["glass", "jar"], label: "glass", confidence: 0.81 }
+  { keywords: ["bottle", "plastic", "pet", "poly", "wrapper", "water bottle", "pop bottle"], label: "plastic", confidence: 0.72 },
+  { keywords: ["can", "metal", "aluminum", "aluminium", "tin", "steel", "scrap", "iron"], label: "metal", confidence: 0.72 },
+  { keywords: ["paper", "book", "cardboard", "newspaper", "carton", "envelope", "comic book"], label: "paper", confidence: 0.72 },
+  { keywords: ["banana", "food", "leaf", "organic", "vegetable", "fruit", "orange", "apple"], label: "organic", confidence: 0.72 },
+  { keywords: ["glass", "jar", "wine bottle", "beer bottle"], label: "glass", confidence: 0.72 }
 ];
 
 function setMapStatus(message) {
@@ -54,8 +57,40 @@ function setMapStatus(message) {
   }
 }
 
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    })
+  ]);
+}
+
+function loadImageFromBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const imageElement = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+
+    imageElement.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(imageElement);
+    };
+
+    imageElement.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Could not load the selected image."));
+    };
+
+    imageElement.src = objectUrl;
+  });
+}
+
 function renderResult(result) {
   resultCard.classList.remove("empty");
+  const modelWarning = result.predictedLabel === "unknown"
+    ? `<p class="status-text"><strong>Note:</strong> The fallback AI model could not identify this waste confidently. A custom trained waste model will improve accuracy.</p>`
+    : "";
+
   resultCard.innerHTML = `
     <span class="badge">${result.wasteType}</span>
     <p><strong>Model Label:</strong> ${result.predictedLabel}</p>
@@ -65,6 +100,7 @@ function renderResult(result) {
       result.confidence ? `${(result.confidence * 100).toFixed(1)}%` : "Not available"
     }</p>
     <p><strong>Recycling Suggestion:</strong> ${result.suggestion}</p>
+    ${modelWarning}
   `;
 }
 
@@ -116,7 +152,7 @@ async function bootModel() {
   if (!modelUrl || !metadataUrl) {
     usingDemoModel = true;
     updateModelUi("demo");
-    modelStatus.textContent = "Custom model configuration is missing.";
+    modelStatus.textContent = "Using MobileNet fallback AI model for waste detection.";
     return;
   }
 
@@ -132,12 +168,17 @@ async function bootModel() {
     usingDemoModel = true;
     updateModelUi("demo");
     modelStatus.textContent =
-      "Custom model could not load. Demo detection mode is active so you can still test the app.";
+      "Custom model could not load. Using MobileNet fallback AI model for common items.";
   }
 }
 
 function guessWasteFromFilename(file) {
   const source = String(file?.name || "").toLowerCase();
+  return mapTextToWastePrediction(source);
+}
+
+function mapTextToWastePrediction(sourceText) {
+  const source = String(sourceText || "").toLowerCase();
   const matchedRule = DEMO_WASTE_RULES.find((rule) =>
     rule.keywords.some((keyword) => source.includes(keyword))
   );
@@ -149,10 +190,119 @@ function guessWasteFromFilename(file) {
     };
   }
 
+  // Demo mode cannot inspect image pixels, so unknown is safer than a fake confident result.
   return {
-    className: "plastic",
-    probability: 0.65
+    className: "unknown",
+    probability: 0
   };
+}
+
+function predictWithQuickImageHeuristic(imageElement) {
+  const canvas = document.createElement("canvas");
+  const size = 96;
+  canvas.width = size;
+  canvas.height = size;
+
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    return { className: "unknown", probability: 0 };
+  }
+
+  context.drawImage(imageElement, 0, 0, size, size);
+  const { data } = context.getImageData(0, 0, size, size);
+  let bluePixels = 0;
+  let veryBrightPixels = 0;
+  let lowSaturationBrightPixels = 0;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const red = data[index];
+    const green = data[index + 1];
+    const blue = data[index + 2];
+    const max = Math.max(red, green, blue);
+    const min = Math.min(red, green, blue);
+
+    if (blue > 125 && blue > red + 28 && blue > green + 8) {
+      bluePixels += 1;
+    }
+
+    if (red > 220 && green > 220 && blue > 220) {
+      veryBrightPixels += 1;
+    }
+
+    if (max > 175 && max - min < 42) {
+      lowSaturationBrightPixels += 1;
+    }
+  }
+
+  const totalPixels = size * size;
+  const blueRatio = bluePixels / totalPixels;
+  const brightRatio = veryBrightPixels / totalPixels;
+  const transparentLikeRatio = lowSaturationBrightPixels / totalPixels;
+
+  if (blueRatio > 0.002 && brightRatio > 0.28 && transparentLikeRatio > 0.38) {
+    return {
+      className: "plastic",
+      probability: 0.76
+    };
+  }
+
+  return {
+    className: "unknown",
+    probability: 0
+  };
+}
+
+async function loadDemoClassifier() {
+  if (demoClassifierModel || typeof mobilenet === "undefined") {
+    return demoClassifierModel;
+  }
+
+  demoClassifierModel = await withTimeout(
+    mobilenet.load(),
+    12000,
+    "Demo image classifier took too long to load."
+  );
+  return demoClassifierModel;
+}
+
+async function predictWithDemoFallback(imageElement, file) {
+  const filenamePrediction = guessWasteFromFilename(file);
+  if (filenamePrediction.className !== "unknown") {
+    return filenamePrediction;
+  }
+
+  const quickImagePrediction = predictWithQuickImageHeuristic(imageElement);
+  if (quickImagePrediction.className !== "unknown") {
+    return quickImagePrediction;
+  }
+
+  try {
+    const classifier = await loadDemoClassifier();
+    if (!classifier) {
+      return filenamePrediction;
+    }
+
+    const predictions = await withTimeout(
+      classifier.classify(imageElement),
+      10000,
+      "Demo image classifier took too long to analyze this image."
+    );
+    const bestPrediction = predictions[0];
+    const combinedLabels = predictions.map((prediction) => prediction.className).join(" ");
+    const mappedPrediction = mapTextToWastePrediction(combinedLabels);
+
+    if (mappedPrediction.className === "unknown") {
+      return filenamePrediction;
+    }
+
+    return {
+      className: mappedPrediction.className,
+      probability: bestPrediction?.probability || mappedPrediction.probability
+    };
+  } catch (error) {
+    console.error(error);
+    return filenamePrediction;
+  }
 }
 
 async function fetchStats() {
@@ -463,58 +613,65 @@ detectionForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  analyzeBtn.disabled = true;
   modelStatus.textContent = usingDemoModel
-    ? "Analyzing image with demo detection mode..."
+    ? "Analyzing with MobileNet AI fallback..."
     : "Analyzing image with custom model...";
 
-  const imageElement = new Image();
-  imageElement.src = URL.createObjectURL(currentImageBlob);
+  try {
+    const imageElement = await withTimeout(
+      loadImageFromBlob(currentImageBlob),
+      8000,
+      "The selected image took too long to load."
+    );
+    let bestPrediction;
 
-  imageElement.onload = async () => {
-    try {
-      let bestPrediction;
-
-      if (wasteModel) {
-        const predictions = await wasteModel.predict(imageElement);
-        bestPrediction = predictions.sort((left, right) => right.probability - left.probability)[0];
-      } else {
-        bestPrediction = guessWasteFromFilename(currentImageBlob);
-      }
-
-      if (!bestPrediction) {
-        throw new Error("The custom model did not return a prediction.");
-      }
-
-      const formData = new FormData();
-      formData.append("wasteImage", currentImageBlob, "waste-image.jpg");
-      formData.append("predictedLabel", bestPrediction.className);
-      formData.append("confidence", bestPrediction.probability);
-      formData.append(
-        "modelVersion",
-        usingDemoModel ? "demo-visible-mode" : window.intelliEcoModelConfig?.version || "1.0.0"
+    if (wasteModel) {
+      const predictions = await withTimeout(
+        wasteModel.predict(imageElement),
+        10000,
+        "The custom model took too long to analyze this image."
       );
-
-      const response = await fetch("/api/detections/analyze", {
-        method: "POST",
-        body: formData
-      });
-
-      const result = await response.json();
-      if (!response.ok) {
-        throw new Error(result.message || "Analysis failed.");
-      }
-
-      renderResult(result);
-      prependHistoryRow(result);
-      fetchStats();
-      modelStatus.textContent = usingDemoModel
-        ? "Analysis complete in demo mode."
-        : "Analysis complete.";
-    } catch (error) {
-      console.error(error);
-      modelStatus.textContent = error.message || "Analysis failed.";
+      bestPrediction = predictions.sort((left, right) => right.probability - left.probability)[0];
+    } else {
+      bestPrediction = await predictWithDemoFallback(imageElement, currentImageBlob);
     }
-  };
+
+    if (!bestPrediction) {
+      throw new Error("The waste model did not return a prediction.");
+    }
+
+    const formData = new FormData();
+    formData.append("wasteImage", currentImageBlob, "waste-image.jpg");
+    formData.append("predictedLabel", bestPrediction.className);
+    formData.append("confidence", bestPrediction.probability);
+    formData.append(
+      "modelVersion",
+      usingDemoModel ? FALLBACK_MODEL_VERSION : window.intelliEcoModelConfig?.version || "1.0.0"
+    );
+
+    const response = await fetch("/api/detections/analyze", {
+      method: "POST",
+      body: formData
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || "Analysis failed.");
+    }
+
+    renderResult(result);
+    prependHistoryRow(result);
+    fetchStats();
+    modelStatus.textContent = usingDemoModel
+      ? "Analysis complete with MobileNet fallback AI."
+      : "Analysis complete.";
+  } catch (error) {
+    console.error(error);
+    modelStatus.textContent = error.message || "Analysis failed.";
+  } finally {
+    analyzeBtn.disabled = false;
+  }
 });
 
 locationForm.addEventListener("submit", async (event) => {

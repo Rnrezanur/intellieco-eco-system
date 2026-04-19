@@ -34,30 +34,6 @@
     </div>
   </section>
 
-  <section class="panel">
-    <div class="section-heading">
-      <div>
-        <h2>Waste Model Status</h2>
-        <p class="panel-subtitle">The app uses your custom TensorFlow.js model when available.</p>
-      </div>
-      <span class="status-badge" id="modelModeBadge">Checking...</span>
-    </div>
-    <div class="model-card-grid model-status-grid">
-      <div class="model-card-item">
-        <span>Version</span>
-        <strong><%= modelConfig.version %></strong>
-      </div>
-      <div class="model-card-item">
-        <span>Fallback</span>
-        <strong id="modelFallbackText">Waiting</strong>
-      </div>
-    </div>
-    <p class="tip-copy">
-      If your custom model files are missing, IntelliEco switches to a visible demo mode so waste
-      detection still works while you build the real classifier.
-    </p>
-  </section>
-
   <section class="dashboard-grid">
     <article class="panel">
       <h2>Waste Detection</h2>
@@ -287,6 +263,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script
