@@ -4,68 +4,93 @@
 <main class="dashboard-page">
   <%- include("../partials/flash") %>
 
-  <section class="dashboard-header">
+  <section class="dashboard-header admin-hero">
     <div>
-      <span class="eyebrow">Admin Overview</span>
-      <h1>IntelliEco Control Panel</h1>
-      <p>Review users, waste trends, and recent detections across the whole platform.</p>
+      <span class="eyebrow">Operations Center</span>
+      <h1>Admin Dashboard</h1>
+      <p>Manage pickup requests, monitor collected waste, and review AI detection activity from one clear workspace.</p>
     </div>
-    <div class="tip-card">
-      <h2>Admin Actions</h2>
-      <p>Use this panel to monitor activity and verify that your custom waste model is classifying expected categories.</p>
+    <div class="tip-card admin-command-card">
+      <span class="eyebrow">Today</span>
+      <h2><%= adminSummary.pendingPickups %> pending pickups</h2>
+      <p>Prioritize requests, assign delivery people, and mark pickups as collected to reward users.</p>
     </div>
   </section>
 
-  <section class="metric-grid">
-    <article class="metric-card">
-      <span>Total Users</span>
-      <strong id="adminTotalUsers"><%= users.length %></strong>
+  <section class="admin-summary-grid">
+    <article class="admin-summary-card">
+      <span class="summary-icon">REQ</span>
+      <p>Total Requests</p>
+      <strong id="adminTotalRequests"><%= adminSummary.totalPickupRequests %></strong>
     </article>
-    <article class="metric-card">
-      <span>Verified Users</span>
-      <strong id="adminVerifiedUsers">0</strong>
+    <article class="admin-summary-card">
+      <span class="summary-icon">KG</span>
+      <p>Total Waste Collected</p>
+      <strong id="adminCollectedWeight"><%= adminSummary.totalWasteCollected.toFixed(1) %> kg</strong>
     </article>
-    <article class="metric-card">
-      <span>Total Detections</span>
-      <strong id="adminTotalDetections"><%= recentDetections.length %></strong>
+    <article class="admin-summary-card">
+      <span class="summary-icon">USR</span>
+      <p>Active Users</p>
+      <strong id="adminActiveUsers"><%= adminSummary.activeUsers %></strong>
+    </article>
+    <article class="admin-summary-card admin-summary-card-alert">
+      <span class="summary-icon">PEN</span>
+      <p>Pending Pickups</p>
+      <strong id="adminPendingPickups"><%= adminSummary.pendingPickups %></strong>
     </article>
   </section>
 
-  <section class="dashboard-grid dashboard-grid-alt">
-    <article class="panel">
+  <section class="admin-analytics-grid">
+    <article class="panel admin-panel">
       <h2>Platform Waste Breakdown</h2>
       <div class="chart-card">
         <canvas id="adminWasteChart"></canvas>
       </div>
     </article>
-    <article class="panel">
-      <div class="section-heading">
-        <div>
-          <h2>Reports</h2>
-          <p class="panel-subtitle">Download platform waste activity as CSV or PDF.</p>
-        </div>
+    <article class="panel admin-panel">
+      <h2>Pickup Trends</h2>
+      <p class="panel-subtitle">Daily pickup requests and estimated waste weight.</p>
+      <div class="chart-card">
+        <canvas id="adminPickupTrendChart"></canvas>
+      </div>
+    </article>
+    <article class="panel admin-panel">
+      <h2>Recent Activity</h2>
+      <div id="auditLogList" class="audit-log-list">
+        <% auditLogs.forEach((log) => { %>
+          <article class="audit-card">
+            <strong><%= log.actionType %></strong>
+            <p><%= log.adminUser?.email || "Unknown admin" %> acted on <%= log.targetType %></p>
+            <p><%= new Date(log.createdAt).toLocaleString() %></p>
+          </article>
+        <% }) %>
+      </div>
+    </article>
+  </section>
+
+  <section class="panel admin-panel">
+    <div class="section-heading">
+      <div>
+        <h2>Pickup Requests</h2>
+        <p class="panel-subtitle">Uploaded images, AI results, weight, user details, and assignment controls.</p>
       </div>
       <div class="report-actions">
         <a href="/admin/reports/csv" class="button button-secondary">Download CSV</a>
         <a href="/admin/reports/pdf" class="button">Download PDF</a>
       </div>
-      <div class="chart-card">
-        <canvas id="adminVersionChart"></canvas>
-      </div>
-    </article>
-  </section>
-
-  <section class="dashboard-grid dashboard-grid-alt">
-    <article class="panel">
-      <h2>Pickup Requests</h2>
+    </div>
       <div class="table-wrapper">
         <table class="history-table">
           <thead>
             <tr>
+              <th>Image</th>
               <th>User</th>
-              <th>Waste</th>
+              <th>AI Detection</th>
+              <th>Items</th>
+              <th>Weight</th>
               <th>Area</th>
               <th>Phone</th>
+              <th>Time</th>
               <th>Status</th>
               <th>Assign</th>
               <th>Action</th>
@@ -74,15 +99,29 @@
           <tbody id="pickupRequestTableBody">
             <% if (pickupRequests.length === 0) { %>
               <tr>
-                <td colspan="7">No pickup requests yet.</td>
+                <td colspan="10">No pickup requests yet.</td>
               </tr>
             <% } %>
             <% pickupRequests.forEach((pickup) => { %>
               <tr data-pickup-id="<%= pickup._id %>">
+                <td>
+                  <% if (pickup.imagePath || pickup.linkedDetection?.imagePath) { %>
+                    <img src="<%= pickup.imagePath || pickup.linkedDetection?.imagePath %>" alt="<%= pickup.wasteType %>" class="history-thumb" />
+                  <% } else { %>
+                    No image
+                  <% } %>
+                </td>
                 <td><%= pickup.user?.email || "Unknown user" %></td>
-                <td><%= pickup.wasteType %></td>
+                <td><strong><%= pickup.wasteType %></strong></td>
+                <td>
+                  <% (pickup.detectedItems || []).forEach((item) => { %>
+                    <span class="mini-badge"><%= item.wasteType %> x<%= item.quantity %></span>
+                  <% }) %>
+                </td>
+                <td><%= pickup.approximateWeightKg || "N/A" %> kg</td>
                 <td><%= pickup.areaName %><br /><span class="status-text"><%= pickup.addressLine %></span></td>
                 <td><%= pickup.contactPhone %></td>
+                <td><%= new Date(pickup.createdAt).toLocaleString() %></td>
                 <td>
                   <select class="pickup-status-select">
                     <% ["pending", "assigned", "picked_up"].forEach((status) => { %>
@@ -101,7 +140,6 @@
           </tbody>
         </table>
       </div>
-    </article>
   </section>
 
   <section class="dashboard-grid dashboard-grid-alt">
@@ -135,22 +173,21 @@
       </div>
     </article>
     <article class="panel">
-      <h2>Audit Logs</h2>
-      <div id="auditLogList" class="audit-log-list">
-        <% auditLogs.forEach((log) => { %>
-          <article class="audit-card">
-            <strong><%= log.actionType %></strong>
-            <p><%= log.adminUser?.email || "Unknown admin" %> acted on <%= log.targetType %></p>
-            <p><%= new Date(log.createdAt).toLocaleString() %></p>
-          </article>
-        <% }) %>
+      <h2>Model Version Performance</h2>
+      <div class="chart-card">
+        <canvas id="adminVersionChart"></canvas>
       </div>
     </article>
   </section>
 
   <section class="dashboard-grid dashboard-grid-alt">
     <article class="panel">
-      <h2>Role Management</h2>
+      <div class="section-heading">
+        <div>
+          <h2>Role Management</h2>
+          <p class="panel-subtitle">Manage user and admin permissions.</p>
+        </div>
+      </div>
       <div class="table-wrapper">
         <table class="history-table">
           <thead>
@@ -164,8 +201,8 @@
             </tr>
           </thead>
           <tbody id="userRoleTableBody">
-            <% users.forEach((user) => { %>
-              <tr data-user-id="<%= user._id %>">
+            <% users.forEach((user, index) => { %>
+              <tr data-user-id="<%= user._id %>" class="<%= index >= 3 ? 'hidden' : '' %>">
                 <td><%= user.name %></td>
                 <td><%= user.email %></td>
                 <td>
@@ -188,6 +225,13 @@
           </tbody>
         </table>
       </div>
+      <% if (users.length > 3) { %>
+        <div class="table-more-footer">
+          <button type="button" class="ghost-button open-admin-modal-btn" data-modal-target="roleManagementModal">
+            See More Users
+          </button>
+        </div>
+      <% } %>
     </article>
     <article class="panel">
       <h2>Model Version Performance</h2>
@@ -216,7 +260,9 @@
         <h2>Recent Detections</h2>
         <p class="panel-subtitle">Review corrections to compare predicted and manually confirmed waste types.</p>
       </div>
-      <div id="reviewSummaryPill" class="stat-pill">Loading review status...</div>
+      <div class="section-actions">
+        <div id="reviewSummaryPill" class="stat-pill">Loading review status...</div>
+      </div>
     </div>
     <div class="table-wrapper">
       <table class="history-table">
@@ -237,8 +283,168 @@
               <td colspan="7">No detections yet.</td>
             </tr>
           <% } %>
+          <% recentDetections.forEach((item, index) => { %>
+            <tr data-detection-id="<%= item._id %>" class="<%= index >= 3 ? 'hidden' : '' %>">
+              <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
+              <td><%= item.predictedLabel %></td>
+              <td><%= item.modelVersion || "1.0.0" %></td>
+              <td><%= item.wasteType %></td>
+              <td>
+                <form class="review-form">
+                  <select class="review-select">
+                    <% ["Plastic", "Metal", "Paper", "Organic", "Glass", "Unknown"].forEach((type) => { %>
+                      <option
+                        value="<%= type %>"
+                        <%= (item.reviewedWasteType || item.wasteType) === type ? "selected" : "" %>
+                      >
+                        <%= type %>
+                      </option>
+                    <% }) %>
+                  </select>
+                  <input
+                    type="text"
+                    class="review-note"
+                    value="<%= item.reviewNote || "" %>"
+                    placeholder="Optional note"
+                  />
+                  <button type="submit" class="ghost-button">Save Review</button>
+                  <p class="status-text">
+                    <%= item.reviewStatus === "corrected" ? `Corrected to ${item.reviewedWasteType} by ${item.reviewedBy?.email || item.reviewedBy?.name || "admin"}` : "Not reviewed yet" %>
+                  </p>
+                </form>
+              </td>
+              <td><%= item.confidence ? `${(item.confidence * 100).toFixed(1)}%` : "N/A" %></td>
+              <td><%= new Date(item.createdAt).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (recentDetections.length > 3) { %>
+      <div class="table-more-footer">
+        <button type="button" class="ghost-button open-admin-modal-btn" data-modal-target="recentDetectionsModal">
+          See More Detections
+        </button>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<div id="roleManagementModal" class="admin-list-modal hidden" aria-hidden="true">
+  <div class="admin-list-modal-backdrop" data-close-admin-modal></div>
+  <section class="admin-list-modal-card" role="dialog" aria-modal="true" aria-labelledby="roleManagementModalTitle">
+    <div class="admin-list-modal-header">
+      <div>
+        <h2 id="roleManagementModalTitle">All Users</h2>
+        <p class="panel-subtitle">Search and filter role management records.</p>
+      </div>
+      <button type="button" class="modal-close-button" data-close-admin-modal aria-label="Close role management popup">&times;</button>
+    </div>
+    <div class="admin-list-toolbar">
+      <input type="search" class="admin-modal-search" data-modal-search="roleManagementModal" placeholder="Search by name or email" />
+      <select class="role-select admin-modal-filter" data-modal-filter="roleManagementModal" data-filter-key="role">
+        <option value="">All roles</option>
+        <option value="admin">Admin</option>
+        <option value="user">User</option>
+      </select>
+      <select class="role-select admin-modal-filter" data-modal-filter="roleManagementModal" data-filter-key="verified">
+        <option value="">All verification</option>
+        <option value="yes">Verified</option>
+        <option value="no">Not verified</option>
+      </select>
+    </div>
+    <div class="table-wrapper admin-list-modal-body">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Verified</th>
+            <th>Joined</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% users.forEach((user) => { %>
+            <tr
+              class="admin-modal-row"
+              data-user-id="<%= user._id %>"
+              data-search="<%= `${user.name} ${user.email}`.toLowerCase() %>"
+              data-role="<%= user.role %>"
+              data-verified="<%= user.isVerified ? 'yes' : 'no' %>"
+            >
+              <td><%= user.name %></td>
+              <td><%= user.email %></td>
+              <td>
+                <select class="role-select" <%= String(user._id) === String(currentUser.id) ? "disabled" : "" %>>
+                  <option value="user" <%= user.role === "user" ? "selected" : "" %>>user</option>
+                  <option value="admin" <%= user.role === "admin" ? "selected" : "" %>>admin</option>
+                </select>
+              </td>
+              <td><%= user.isVerified ? "Yes" : "No" %></td>
+              <td><%= new Date(user.createdAt).toLocaleString() %></td>
+              <td>
+                <% if (String(user._id) === String(currentUser.id)) { %>
+                  <span class="status-text">Current account</span>
+                <% } else { %>
+                  <button type="button" class="ghost-button save-role-btn">Save Role</button>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div id="recentDetectionsModal" class="admin-list-modal hidden" aria-hidden="true">
+  <div class="admin-list-modal-backdrop" data-close-admin-modal></div>
+  <section class="admin-list-modal-card admin-list-modal-card-wide" role="dialog" aria-modal="true" aria-labelledby="recentDetectionsModalTitle">
+    <div class="admin-list-modal-header">
+      <div>
+        <h2 id="recentDetectionsModalTitle">All Recent Detections</h2>
+        <p class="panel-subtitle">Search and filter detection review records.</p>
+      </div>
+      <button type="button" class="modal-close-button" data-close-admin-modal aria-label="Close recent detections popup">&times;</button>
+    </div>
+    <div class="admin-list-toolbar">
+      <input type="search" class="admin-modal-search" data-modal-search="recentDetectionsModal" placeholder="Search by waste type, model, or label" />
+      <select class="role-select admin-modal-filter" data-modal-filter="recentDetectionsModal" data-filter-key="waste">
+        <option value="">All waste types</option>
+        <% ["Plastic", "Metal", "Paper", "Organic", "Glass", "Unknown"].forEach((type) => { %>
+          <option value="<%= type.toLowerCase() %>"><%= type %></option>
+        <% }) %>
+      </select>
+      <select class="role-select admin-modal-filter" data-modal-filter="recentDetectionsModal" data-filter-key="review">
+        <option value="">All review status</option>
+        <option value="pending">Pending</option>
+        <option value="corrected">Corrected</option>
+      </select>
+    </div>
+    <div class="table-wrapper admin-list-modal-body">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Class Label</th>
+            <th>Model Version</th>
+            <th>Waste Type</th>
+            <th>Review</th>
+            <th>Confidence</th>
+            <th>Date & Time</th>
+          </tr>
+        </thead>
+        <tbody>
           <% recentDetections.forEach((item) => { %>
-            <tr data-detection-id="<%= item._id %>">
+            <tr
+              class="admin-modal-row"
+              data-detection-id="<%= item._id %>"
+              data-search="<%= `${item.predictedLabel} ${item.modelVersion || ''} ${item.wasteType}`.toLowerCase() %>"
+              data-waste="<%= String(item.wasteType || '').toLowerCase() %>"
+              data-review="<%= item.reviewStatus || 'pending' %>"
+            >
               <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
               <td><%= item.predictedLabel %></td>
               <td><%= item.modelVersion || "1.0.0" %></td>
@@ -275,7 +481,7 @@
       </table>
     </div>
   </section>
-</main>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="/js/admin.js"></script>

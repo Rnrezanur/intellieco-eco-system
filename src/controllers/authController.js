@@ -137,7 +137,7 @@ async function login(req, res) {
       role: user.role
     };
 
-    return res.redirect("/dashboard");
+    return res.redirect(user.role === "admin" ? "/admin" : "/dashboard");
   } catch (error) {
     console.error(error);
     req.flash("error", "Login failed.");

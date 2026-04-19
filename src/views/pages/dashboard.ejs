@@ -93,8 +93,8 @@
     <article class="panel finder-panel">
       <div class="finder-top">
         <div>
-          <h2>Find Recycling Centers</h2>
-          <p class="panel-subtitle">Search an area to show a map and nearby recycling centers.</p>
+          <h2>Find Center</h2>
+          <p class="panel-subtitle">Search by area or view every available waste collection center on the map.</p>
         </div>
       </div>
 
@@ -104,27 +104,35 @@
           <input
             type="text"
             id="locationInput"
-            placeholder="Example: Kuril, Dhaka"
+            placeholder="Example: Kuril or Khilkhet"
             required
           />
         </div>
         <button type="submit" class="button">Search Map</button>
       </form>
+      <button type="button" id="showAllCentersBtn" class="ghost-button finder-wide-button">
+        See All Center Locations
+      </button>
 
       <div class="finder-status-shell">
         <p id="mapStatus" class="status-text finder-status">
-          Search an area to show nearby recycling centers and their locations on the map.
+          Search an area or view all center locations. Current available center: Kuril-Khilkhet, Dhaka.
         </p>
       </div>
 
       <div id="finderResults" class="finder-results hidden">
-        <div class="finder-map-wrap">
-          <div id="recyclingMap" class="map-box"></div>
+        <div class="finder-map-layout">
+          <div class="finder-map-wrap">
+            <div id="recyclingMap" class="map-box"></div>
+          </div>
+          <aside class="finder-side-panel">
+            <div class="finder-side-head">
+              <span class="eyebrow">Available Centers</span>
+              <strong id="centerCountLabel">0</strong>
+            </div>
+            <div id="recyclingList" class="recycling-list"></div>
+          </aside>
         </div>
-        <div class="finder-actions hidden" id="finderActions">
-          <button type="button" id="seeAllCentersBtn" class="ghost-button">See All Centers</button>
-        </div>
-        <div id="recyclingList" class="recycling-list"></div>
       </div>
     </article>
   </section>
@@ -143,14 +151,50 @@
           <input type="text" id="pickupWasteType" placeholder="Example: Plastic bottles" required />
         </label>
         <label>
+          Approx. Weight
+          <select id="pickupWeight" class="role-select" required>
+            <option value="">Select weight</option>
+            <option value="0.5">0.5 kg</option>
+            <option value="1">1 kg</option>
+            <option value="2">2 kg</option>
+            <option value="5">5 kg</option>
+            <option value="10">10 kg</option>
+            <option value="15">15+ kg</option>
+          </select>
+        </label>
+      </div>
+      <div class="pickup-grid">
+        <label>
+          Upload Waste Image
+          <input type="file" id="pickupImage" accept="image/*" />
+        </label>
+        <label>
+          Use Previous Detection
+          <select id="previousDetectionSelect" class="role-select">
+            <option value="">Choose from history</option>
+            <% history.forEach((item) => { %>
+              <option
+                value="<%= item._id %>"
+                data-waste-type="<%= item.wasteType %>"
+                data-image-path="<%= item.imagePath %>"
+              >
+                <%= item.wasteType %> - <%= new Date(item.createdAt).toLocaleString() %>
+              </option>
+            <% }) %>
+          </select>
+        </label>
+      </div>
+      <div id="pickupDetectedItemsPreview" class="detected-items-preview hidden"></div>
+      <div class="pickup-grid">
+        <label>
           Contact Phone
           <input type="text" id="pickupPhone" placeholder="Example: 01XXXXXXXXX" required />
         </label>
+        <label>
+          Area / Location Name
+          <input type="text" id="pickupArea" value="Kuril, Dhaka" required />
+        </label>
       </div>
-      <label>
-        Area / Location Name
-        <input type="text" id="pickupArea" value="Kuril, Dhaka" required />
-      </label>
       <label>
         Full Address
         <input type="text" id="pickupAddress" placeholder="House, road, landmark" required />
@@ -178,6 +222,9 @@
         <thead>
           <tr>
             <th>Waste Type</th>
+            <th>Image</th>
+            <th>Weight</th>
+            <th>Items</th>
             <th>Area</th>
             <th>Phone</th>
             <th>Status</th>
@@ -189,12 +236,25 @@
         <tbody id="pickupHistoryBody">
           <% if (pickupRequests.length === 0) { %>
             <tr>
-              <td colspan="7">No pickup requests yet.</td>
+              <td colspan="10">No pickup requests yet.</td>
             </tr>
           <% } %>
           <% pickupRequests.forEach((item) => { %>
             <tr>
               <td><%= item.wasteType %></td>
+              <td>
+                <% if (item.imagePath) { %>
+                  <img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" />
+                <% } else { %>
+                  No image
+                <% } %>
+              </td>
+              <td><%= item.approximateWeightKg || "N/A" %> kg</td>
+              <td>
+                <% (item.detectedItems || []).forEach((detectedItem) => { %>
+                  <span class="mini-badge"><%= detectedItem.wasteType %> x<%= detectedItem.quantity %></span>
+                <% }) %>
+              </td>
               <td><%= item.areaName %></td>
               <td><%= item.contactPhone %></td>
               <td><%= item.status %></td>
@@ -210,8 +270,10 @@
 
   <section class="panel">
     <div class="history-header">
-      <h2>Detection History</h2>
-      <p>Each analysis is stored with the image, waste type, and timestamp.</p>
+      <div>
+        <h2>Detection History</h2>
+        <p>Each analysis is stored with the image, waste type, and timestamp.</p>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -232,8 +294,78 @@
               <td colspan="6">No detections yet.</td>
             </tr>
           <% } %>
+          <% history.forEach((item, index) => { %>
+            <tr class="<%= index >= 3 ? 'hidden' : '' %>">
+              <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
+              <td><%= item.wasteType %></td>
+              <td><%= item.modelVersion || "1.0.0" %></td>
+              <td><%= item.confidence ? `${(item.confidence * 100).toFixed(1)}%` : "N/A" %></td>
+              <td><%= item.suggestion %></td>
+              <td><%= new Date(item.createdAt).toLocaleString() %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <% if (history.length > 0) { %>
+      <div class="table-more-footer">
+        <button type="button" id="openDetectionHistoryModalBtn" class="ghost-button">
+          See More History
+        </button>
+      </div>
+    <% } %>
+  </section>
+</main>
+
+<div id="detectionHistoryModal" class="admin-list-modal hidden" aria-hidden="true">
+  <div class="admin-list-modal-backdrop" data-close-history-modal></div>
+  <section class="admin-list-modal-card admin-list-modal-card-wide" role="dialog" aria-modal="true" aria-labelledby="detectionHistoryModalTitle">
+    <div class="admin-list-modal-header">
+      <div>
+        <h2 id="detectionHistoryModalTitle">Detection History</h2>
+        <p class="panel-subtitle">Search, filter, and select one or multiple detections for pickup request.</p>
+      </div>
+      <button type="button" class="modal-close-button" data-close-history-modal aria-label="Close detection history popup">&times;</button>
+    </div>
+    <div class="admin-list-toolbar">
+      <input type="search" id="historyModalSearch" placeholder="Search by waste type, model, or suggestion" />
+      <select id="historyWasteFilter" class="role-select">
+        <option value="">All waste types</option>
+        <% ["Plastic", "Metal", "Paper", "Organic", "Glass", "Unknown"].forEach((type) => { %>
+          <option value="<%= type.toLowerCase() %>"><%= type %></option>
+        <% }) %>
+      </select>
+      <button type="button" id="applyHistorySelectionBtn" class="button">Use Selected</button>
+    </div>
+    <div class="table-wrapper admin-list-modal-body">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>Image</th>
+            <th>Waste Type</th>
+            <th>Model Version</th>
+            <th>Confidence</th>
+            <th>Suggestion</th>
+            <th>Date & Time</th>
+          </tr>
+        </thead>
+        <tbody>
           <% history.forEach((item) => { %>
-            <tr>
+            <tr
+              class="history-modal-row"
+              data-search="<%= `${item.wasteType} ${item.modelVersion || ''} ${item.suggestion || ''}`.toLowerCase() %>"
+              data-waste="<%= String(item.wasteType || '').toLowerCase() %>"
+            >
+              <td>
+                <input
+                  type="checkbox"
+                  class="history-select-checkbox"
+                  value="<%= item._id %>"
+                  data-waste-type="<%= item.wasteType %>"
+                  data-image-path="<%= item.imagePath %>"
+                />
+              </td>
               <td><img src="<%= item.imagePath %>" alt="<%= item.wasteType %>" class="history-thumb" /></td>
               <td><%= item.wasteType %></td>
               <td><%= item.modelVersion || "1.0.0" %></td>
@@ -246,20 +378,22 @@
       </table>
     </div>
   </section>
-</main>
+</div>
 
-<div id="centersModal" class="centers-modal hidden">
+<div id="centersModal" class="centers-modal hidden" aria-hidden="true">
   <div class="centers-modal-backdrop" id="centersModalBackdrop"></div>
-  <div class="centers-modal-card">
+  <section class="centers-modal-card" role="dialog" aria-modal="true" aria-labelledby="centersModalTitle">
     <div class="centers-modal-header">
       <div>
-        <h2>All Recycling Centers</h2>
-        <p class="panel-subtitle" id="centersModalSubtitle">Search an area to see all centers.</p>
+        <h2 id="centersModalTitle">All Center Locations</h2>
+        <p class="panel-subtitle">Available center: Kuril-Khilkhet, Dhaka.</p>
       </div>
-      <button type="button" id="closeCentersModalBtn" class="ghost-button">Close</button>
+      <button type="button" id="closeCentersModalBtn" class="modal-close-button" aria-label="Close all centers map">
+        &times;
+      </button>
     </div>
-    <div id="centersModalList" class="centers-modal-list"></div>
-  </div>
+    <div id="allCentersMap" class="modal-map-box"></div>
+  </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>

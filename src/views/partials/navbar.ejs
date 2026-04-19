@@ -3,9 +3,10 @@
   <div class="nav-links">
     <a href="/">Home</a>
     <% if (currentUser) { %>
-      <a href="/dashboard">Dashboard</a>
       <% if (currentUser.role === "admin") { %>
         <a href="/admin">Admin</a>
+      <% } else { %>
+        <a href="/dashboard">Dashboard</a>
       <% } %>
       <form action="/auth/logout" method="POST">
         <button type="submit" class="ghost-button">Logout</button>

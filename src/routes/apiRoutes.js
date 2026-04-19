@@ -26,7 +26,12 @@ router.post(
   upload.single("wasteImage"),
   asyncHandler(detectionController.analyzeWaste)
 );
-router.post("/pickup-requests", requireAuth, asyncHandler(pickupController.createPickupRequest));
+router.post(
+  "/pickup-requests",
+  requireAuth,
+  upload.single("pickupImage"),
+  asyncHandler(pickupController.createPickupRequest)
+);
 router.get("/detections/history", requireAuth, asyncHandler(detectionController.getHistory));
 router.delete("/detections/:id", requireAuth, asyncHandler(detectionController.deleteDetection));
 router.post(

@@ -16,15 +16,54 @@ function getRewardPointsForWaste(wasteType) {
 }
 
 async function createPickupRequest(req, res) {
-  const { wasteType, contactPhone, addressLine, areaName, latitude, longitude, notes } = req.body;
+  const {
+    wasteType,
+    contactPhone,
+    addressLine,
+    areaName,
+    latitude,
+    longitude,
+    notes,
+    approximateWeightKg,
+    linkedDetectionId
+  } = req.body;
+  const approximateWeight = Number(approximateWeightKg || 0);
+  let detectedItems = [];
+  let linkedDetectionIds = [];
 
-  if (!wasteType || !contactPhone || !addressLine || !areaName) {
-    return res.status(400).json({ message: "Waste type, phone, address, and area are required." });
+  if (!wasteType || !contactPhone || !addressLine || !areaName || !approximateWeight) {
+    return res.status(400).json({
+      message: "Waste type, weight, phone, address, and area are required."
+    });
+  }
+
+  try {
+    detectedItems = JSON.parse(req.body.detectedItems || "[]");
+  } catch (error) {
+    detectedItems = [];
+  }
+
+  try {
+    linkedDetectionIds = JSON.parse(req.body.linkedDetectionIds || "[]");
+  } catch (error) {
+    linkedDetectionIds = linkedDetectionId ? [linkedDetectionId] : [];
   }
 
   const pickup = await PickupRequest.create({
     user: req.session.user.id,
     wasteType,
+    imagePath: req.file ? `/uploads/${req.file.filename}` : String(req.body.imagePath || ""),
+    linkedDetection: linkedDetectionIds[0] || linkedDetectionId || undefined,
+    linkedDetections: linkedDetectionIds,
+    approximateWeightKg: approximateWeight,
+    detectedItems: detectedItems.length
+      ? detectedItems
+      : [
+          {
+            wasteType,
+            quantity: 1
+          }
+        ],
     contactPhone,
     addressLine,
     areaName,

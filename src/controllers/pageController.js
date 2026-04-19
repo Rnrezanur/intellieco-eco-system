@@ -21,6 +21,10 @@ function verifyAccountPage(req, res) {
 }
 
 async function dashboardPage(req, res) {
+  if (req.session.user.role === "admin") {
+    return res.redirect("/admin");
+  }
+
   const [history, pickupRequests, userAccount] = await Promise.all([
     Detection.find({ user: req.session.user.id }).sort({ createdAt: -1 }),
     PickupRequest.find({ user: req.session.user.id }).sort({ createdAt: -1 }),
@@ -43,12 +47,31 @@ async function dashboardPage(req, res) {
 }
 
 async function adminPage(req, res) {
-  const [recentDetections, users, auditLogs, reportSchedules, pickupRequests] = await Promise.all([
+  const [
+    recentDetections,
+    users,
+    auditLogs,
+    reportSchedules,
+    pickupRequests,
+    totalPickupRequests,
+    pendingPickups,
+    collectedWeight
+  ] = await Promise.all([
     Detection.find().populate("reviewedBy", "name email").sort({ createdAt: -1 }).limit(12),
     User.find().sort({ createdAt: -1 }).select("name email role isVerified createdAt"),
     AuditLog.find().populate("adminUser", "name email").sort({ createdAt: -1 }).limit(10),
     ReportSchedule.find().sort({ frequency: 1 }),
-    PickupRequest.find().populate("user", "name email").sort({ createdAt: -1 }).limit(20)
+    PickupRequest.find()
+      .populate("user", "name email")
+      .populate("linkedDetection", "imagePath wasteType confidence modelVersion")
+      .sort({ createdAt: -1 })
+      .limit(20),
+    PickupRequest.countDocuments(),
+    PickupRequest.countDocuments({ status: { $ne: "picked_up" } }),
+    PickupRequest.aggregate([
+      { $match: { status: "picked_up" } },
+      { $group: { _id: null, total: { $sum: "$approximateWeightKg" } } }
+    ])
   ]);
 
   res.render("pages/admin", {
@@ -57,7 +80,13 @@ async function adminPage(req, res) {
     users,
     auditLogs,
     reportSchedules,
-    pickupRequests
+    pickupRequests,
+    adminSummary: {
+      totalPickupRequests,
+      totalWasteCollected: collectedWeight[0]?.total || 0,
+      activeUsers: users.filter((user) => user.isVerified).length,
+      pendingPickups
+    }
   });
 }
 

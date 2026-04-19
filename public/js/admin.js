@@ -1,5 +1,6 @@
 let adminWasteChart = null;
 let adminVersionChart = null;
+let adminPickupTrendChart = null;
 
 async function fetchAdminStats() {
   try {
@@ -10,14 +11,25 @@ async function fetchAdminStats() {
       throw new Error(stats.message || "Could not load admin statistics.");
     }
 
-    document.getElementById("adminTotalUsers").textContent = stats.totalUsers;
-    document.getElementById("adminVerifiedUsers").textContent = stats.verifiedUsers;
-    document.getElementById("adminTotalDetections").textContent = stats.totalDetections;
+    const pendingPickups = stats.pickupSummary
+      .filter((entry) => entry._id !== "picked_up")
+      .reduce((total, entry) => total + entry.total, 0);
+    const collectedWeight =
+      stats.pickupSummary.find((entry) => entry._id === "picked_up")?.totalWeight || 0;
+
+    document.getElementById("adminTotalRequests").textContent = stats.pickupSummary.reduce(
+      (total, entry) => total + entry.total,
+      0
+    );
+    document.getElementById("adminCollectedWeight").textContent = `${collectedWeight.toFixed(1)} kg`;
+    document.getElementById("adminActiveUsers").textContent = stats.verifiedUsers;
+    document.getElementById("adminPendingPickups").textContent = pendingPickups;
     updateReviewSummary(stats.reviewSummary);
 
     renderAdminChart(stats.wasteBreakdown);
     renderVersionChart(stats.versionBreakdown);
     renderVersionTable(stats.versionBreakdown);
+    renderPickupTrendChart(stats.pickupTrend);
   } catch (error) {
     console.error(error);
   }
@@ -106,6 +118,60 @@ function renderVersionChart(entries) {
           beginAtZero: true,
           position: "right",
           max: 1,
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderPickupTrendChart(entries) {
+  const context = document.getElementById("adminPickupTrendChart");
+  if (!context) {
+    return;
+  }
+
+  if (adminPickupTrendChart) {
+    adminPickupTrendChart.destroy();
+  }
+
+  adminPickupTrendChart = new Chart(context, {
+    type: "line",
+    data: {
+      labels: entries.map((entry) => entry._id),
+      datasets: [
+        {
+          label: "Pickup Requests",
+          data: entries.map((entry) => entry.total),
+          borderColor: "#244c38",
+          backgroundColor: "rgba(36, 76, 56, 0.12)",
+          fill: true,
+          tension: 0.35,
+          yAxisID: "y"
+        },
+        {
+          label: "Weight (kg)",
+          data: entries.map((entry) => Number((entry.weight || 0).toFixed(1))),
+          borderColor: "#d88b35",
+          backgroundColor: "rgba(216, 139, 53, 0.14)",
+          tension: 0.35,
+          yAxisID: "y1"
+        }
+      ]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0
+          }
+        },
+        y1: {
+          beginAtZero: true,
+          position: "right",
           grid: {
             drawOnChartArea: false
           }
@@ -359,6 +425,83 @@ document.querySelectorAll(".save-pickup-btn").forEach((button) => {
       button.textContent = "Retry";
       button.disabled = false;
     }
+  });
+});
+
+function openAdminModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.remove("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  modal.querySelector(".admin-modal-search")?.focus();
+}
+
+function closeAdminModal(modal) {
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+function filterAdminModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) {
+    return;
+  }
+
+  const searchValue = modal.querySelector(".admin-modal-search")?.value.trim().toLowerCase() || "";
+  const filters = Array.from(modal.querySelectorAll(".admin-modal-filter"));
+
+  modal.querySelectorAll(".admin-modal-row").forEach((row) => {
+    const matchesSearch = !searchValue || row.dataset.search?.includes(searchValue);
+    const matchesFilters = filters.every((filter) => {
+      const filterValue = filter.value;
+      const filterKey = filter.dataset.filterKey;
+      return !filterValue || row.dataset[filterKey] === filterValue;
+    });
+
+    row.classList.toggle("hidden", !(matchesSearch && matchesFilters));
+  });
+}
+
+document.querySelectorAll(".open-admin-modal-btn").forEach((button) => {
+  button.addEventListener("click", () => {
+    openAdminModal(button.dataset.modalTarget);
+  });
+});
+
+document.querySelectorAll("[data-close-admin-modal]").forEach((element) => {
+  element.addEventListener("click", () => {
+    closeAdminModal(element.closest(".admin-list-modal"));
+  });
+});
+
+document.querySelectorAll(".admin-modal-search").forEach((input) => {
+  input.addEventListener("input", () => {
+    filterAdminModal(input.dataset.modalSearch);
+  });
+});
+
+document.querySelectorAll(".admin-modal-filter").forEach((select) => {
+  select.addEventListener("change", () => {
+    filterAdminModal(select.dataset.modalFilter);
+  });
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  document.querySelectorAll(".admin-list-modal:not(.hidden)").forEach((modal) => {
+    closeAdminModal(modal);
   });
 });
 

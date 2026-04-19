@@ -9,7 +9,7 @@ function requireAuth(req, res, next) {
 
 function requireGuest(req, res, next) {
   if (req.session.user) {
-    return res.redirect("/dashboard");
+    return res.redirect(req.session.user.role === "admin" ? "/admin" : "/dashboard");
   }
 
   next();

@@ -15,18 +15,26 @@ const locationInput = document.getElementById("locationInput");
 const mapStatus = document.getElementById("mapStatus");
 const recyclingList = document.getElementById("recyclingList");
 const finderResults = document.getElementById("finderResults");
-const finderActions = document.getElementById("finderActions");
-const seeAllCentersBtn = document.getElementById("seeAllCentersBtn");
+const showAllCentersBtn = document.getElementById("showAllCentersBtn");
+const centerCountLabel = document.getElementById("centerCountLabel");
 const centersModal = document.getElementById("centersModal");
 const centersModalBackdrop = document.getElementById("centersModalBackdrop");
 const closeCentersModalBtn = document.getElementById("closeCentersModalBtn");
-const centersModalList = document.getElementById("centersModalList");
-const centersModalSubtitle = document.getElementById("centersModalSubtitle");
 const modelModeBadge = document.getElementById("modelModeBadge");
 const modelFallbackText = document.getElementById("modelFallbackText");
 const pickupRequestForm = document.getElementById("pickupRequestForm");
 const pickupStatus = document.getElementById("pickupStatus");
 const pickupHistoryBody = document.getElementById("pickupHistoryBody");
+const pickupImageInput = document.getElementById("pickupImage");
+const pickupWeightInput = document.getElementById("pickupWeight");
+const pickupWasteTypeInput = document.getElementById("pickupWasteType");
+const previousDetectionSelect = document.getElementById("previousDetectionSelect");
+const pickupDetectedItemsPreview = document.getElementById("pickupDetectedItemsPreview");
+const openDetectionHistoryModalBtn = document.getElementById("openDetectionHistoryModalBtn");
+const detectionHistoryModal = document.getElementById("detectionHistoryModal");
+const historyModalSearch = document.getElementById("historyModalSearch");
+const historyWasteFilter = document.getElementById("historyWasteFilter");
+const applyHistorySelectionBtn = document.getElementById("applyHistorySelectionBtn");
 const rewardPointsTotal = document.getElementById("rewardPointsTotal");
 const rewardedPickupTotal = document.getElementById("rewardedPickupTotal");
 
@@ -37,10 +45,11 @@ let wasteBreakdownChart = null;
 let wasteTrendChart = null;
 let map = null;
 let mapMarkers = [];
+let allCentersMap = null;
+let allCentersMarkers = [];
 let usingDemoModel = false;
 let demoClassifierModel = null;
-let currentCenters = [];
-let currentCenterLocation = "";
+let selectedPreviousDetections = [];
 const FALLBACK_MODEL_VERSION = "mobilenet-v2-fallback";
 
 const DEMO_WASTE_RULES = [
@@ -152,7 +161,7 @@ async function bootModel() {
   if (!modelUrl || !metadataUrl) {
     usingDemoModel = true;
     updateModelUi("demo");
-    modelStatus.textContent = "Using MobileNet fallback AI model for waste detection.";
+    modelStatus.textContent = "MobileNet AI";
     return;
   }
 
@@ -167,8 +176,7 @@ async function bootModel() {
     wasteModel = null;
     usingDemoModel = true;
     updateModelUi("demo");
-    modelStatus.textContent =
-      "Custom model could not load. Using MobileNet fallback AI model for common items.";
+    modelStatus.textContent = "MobileNet AI";
   }
 }
 
@@ -407,77 +415,85 @@ function ensureMap() {
   }).addTo(map);
 }
 
-function updateRecyclingList(locations) {
-  if (!locations.length) {
-    finderActions?.classList.add("hidden");
-    recyclingList.innerHTML = `
-      <div class="recycling-card recycling-card-tip">
-        <h3>No recycling centers found</h3>
-        <p>Try a nearby larger area or another search term.</p>
-      </div>
-    `;
+function ensureAllCentersMap() {
+  if (allCentersMap) {
     return;
   }
 
-  const previewCenters = locations.slice(0, 2);
-  finderActions?.classList.toggle("hidden", locations.length <= 2);
+  if (typeof L === "undefined") {
+    setMapStatus("Map library could not load right now.");
+    return;
+  }
 
-  recyclingList.innerHTML = previewCenters
-    .map(
-      (location) => `
-        <div class="recycling-card">
-          <div class="recycling-card-head">
-            <h3>${location.name}</h3>
-            <span class="mini-badge">${location.type}</span>
-          </div>
-          <p>${location.address || "Address not provided"}</p>
-        </div>
-      `
-    )
-    .join("");
+  allCentersMap = L.map("allCentersMap").setView([23.8213, 90.4216], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(allCentersMap);
 }
 
-function renderAllCentersModal() {
-  if (!centersModalList) {
-    return;
+function renderCentersOnMap(targetMap, markers, centers) {
+  markers.forEach((marker) => marker.remove());
+  const nextMarkers = [];
+
+  centers.forEach((location) => {
+    const marker = L.marker([location.lat, location.lon])
+      .addTo(targetMap)
+      .bindPopup(
+        `<strong>${location.name}</strong><br/>Area: ${location.area}<br/>Status: ${location.status}<br/>${location.address}`
+      );
+    nextMarkers.push(marker);
+  });
+
+  if (centers.length) {
+    const bounds = L.latLngBounds(centers.map((center) => [center.lat, center.lon]));
+    targetMap.fitBounds(bounds, { padding: [28, 28], maxZoom: 15 });
+    nextMarkers[0]?.openPopup();
   }
 
-  if (!currentCenters.length) {
-    centersModalList.innerHTML = `
-      <div class="recycling-card recycling-card-tip">
-        <h3>No recycling centers found</h3>
-        <p>Search another area to load center details.</p>
-      </div>
-    `;
-    return;
-  }
-
-  centersModalList.innerHTML = currentCenters
-    .map(
-      (location) => `
-        <div class="recycling-card">
-          <div class="recycling-card-head">
-            <h3>${location.name}</h3>
-            <span class="mini-badge">${location.type}</span>
-          </div>
-          <p>${location.address || "Address not provided"}</p>
-        </div>
-      `
-    )
-    .join("");
+  return nextMarkers;
 }
 
-function openCentersModal() {
-  if (!centersModal || !currentCenters.length) {
+async function fetchCenters(placeName = "", showAll = false) {
+  const params = new URLSearchParams();
+  if (placeName) {
+    params.set("query", placeName);
+  }
+  if (showAll) {
+    params.set("all", "true");
+  }
+
+  const response = await fetch(`/api/recycling-centers?${params.toString()}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Location search failed.");
+  }
+
+  return data;
+}
+
+async function openCentersModal() {
+  if (!centersModal) {
     return;
   }
 
-  renderAllCentersModal();
-  if (centersModalSubtitle) {
-    centersModalSubtitle.textContent = `Showing ${currentCenters.length} center${currentCenters.length === 1 ? "" : "s"} in ${currentCenterLocation}.`;
-  }
   centersModal.classList.remove("hidden");
+  centersModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
+  ensureAllCentersMap();
+
+  if (!allCentersMap) {
+    return;
+  }
+
+  setTimeout(() => allCentersMap?.invalidateSize(), 0);
+
+  try {
+    const data = await fetchCenters("", true);
+    allCentersMarkers = renderCentersOnMap(allCentersMap, allCentersMarkers, data.centers);
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 function closeCentersModal() {
@@ -486,18 +502,69 @@ function closeCentersModal() {
   }
 
   centersModal.classList.add("hidden");
+  centersModal.setAttribute("aria-hidden", "true");
   document.body.classList.remove("modal-open");
 }
 
+function updateRecyclingList(locations) {
+  if (centerCountLabel) {
+    centerCountLabel.textContent = `${locations.length}`;
+  }
+
+  if (!locations.length) {
+    recyclingList.innerHTML = `
+      <div class="recycling-card recycling-card-tip">
+        <h3>No centers available in this area yet.</h3>
+        <p>Try Kuril or Khilkhet, or use See All Center Locations.</p>
+      </div>
+    `;
+    return;
+  }
+
+  recyclingList.innerHTML = locations
+    .map(
+      (location) => `
+        <button type="button" class="recycling-card center-card" data-lat="${location.lat}" data-lon="${location.lon}">
+          <div class="recycling-card-head">
+            <h3>${location.name}</h3>
+            <span class="mini-badge">${location.status || "Available"}</span>
+          </div>
+          <p><strong>Area:</strong> ${location.area || "Not specified"}</p>
+          <p>${location.address || "Address not provided"}</p>
+          <p><strong>Type:</strong> ${location.type || "collection center"}</p>
+        </button>
+      `
+    )
+    .join("");
+
+  document.querySelectorAll(".center-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const lat = Number(card.dataset.lat);
+      const lon = Number(card.dataset.lon);
+      if (!map || Number.isNaN(lat) || Number.isNaN(lon)) {
+        return;
+      }
+
+      map.setView([lat, lon], 15);
+    });
+  });
+}
+
 function prependPickupRow(pickup) {
-  const emptyRow = pickupHistoryBody.querySelector("td[colspan='7']");
+  const emptyRow = pickupHistoryBody.querySelector("td[colspan='10']");
   if (emptyRow) {
     emptyRow.parentElement.remove();
   }
 
+  const itemSummary = (pickup.detectedItems || [])
+    .map((item) => `${item.wasteType} x${item.quantity}`)
+    .join(", ");
   const row = document.createElement("tr");
   row.innerHTML = `
     <td>${pickup.wasteType}</td>
+    <td>${pickup.imagePath ? `<img src="${pickup.imagePath}" alt="${pickup.wasteType}" class="history-thumb" />` : "No image"}</td>
+    <td>${pickup.approximateWeightKg || "N/A"} kg</td>
+    <td>${itemSummary || "N/A"}</td>
     <td>${pickup.areaName}</td>
     <td>${pickup.contactPhone}</td>
     <td>${pickup.status}</td>
@@ -508,8 +575,141 @@ function prependPickupRow(pickup) {
   pickupHistoryBody.prepend(row);
 }
 
-async function searchRecyclingCenters(placeName) {
-  if (!placeName) {
+function setPickupDetectedItems(items) {
+  if (!pickupDetectedItemsPreview) {
+    return;
+  }
+
+  if (!items.length) {
+    pickupDetectedItemsPreview.classList.add("hidden");
+    pickupDetectedItemsPreview.innerHTML = "";
+    return;
+  }
+
+  pickupDetectedItemsPreview.classList.remove("hidden");
+  pickupDetectedItemsPreview.innerHTML = `
+    <strong>Detected items</strong>
+    <div class="detected-item-list">
+      ${items
+        .map((item) => `<span class="mini-badge">${item.wasteType} x${item.quantity}</span>`)
+        .join("")}
+    </div>
+  `;
+}
+
+function groupDetectionsAsItems(detections) {
+  const itemMap = new Map();
+
+  detections.forEach((detection) => {
+    const wasteType = detection.wasteType || "Unknown";
+    itemMap.set(wasteType, (itemMap.get(wasteType) || 0) + 1);
+  });
+
+  return Array.from(itemMap.entries()).map(([wasteType, quantity]) => ({
+    wasteType,
+    quantity
+  }));
+}
+
+function syncPickupFromSelectedDetections() {
+  const items = groupDetectionsAsItems(selectedPreviousDetections);
+
+  if (selectedPreviousDetections.length === 1) {
+    pickupWasteTypeInput.value = selectedPreviousDetections[0].wasteType || "";
+  } else if (selectedPreviousDetections.length > 1) {
+    pickupWasteTypeInput.value = "Mixed Waste";
+  } else {
+    pickupWasteTypeInput.value = "";
+  }
+
+  setPickupDetectedItems(items);
+}
+
+function openDetectionHistoryModal() {
+  if (!detectionHistoryModal) {
+    return;
+  }
+
+  detectionHistoryModal.classList.remove("hidden");
+  detectionHistoryModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  historyModalSearch?.focus();
+}
+
+function closeDetectionHistoryModal() {
+  if (!detectionHistoryModal) {
+    return;
+  }
+
+  detectionHistoryModal.classList.add("hidden");
+  detectionHistoryModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+}
+
+function filterDetectionHistoryModal() {
+  if (!detectionHistoryModal) {
+    return;
+  }
+
+  const searchValue = historyModalSearch?.value.trim().toLowerCase() || "";
+  const wasteFilter = historyWasteFilter?.value || "";
+
+  detectionHistoryModal.querySelectorAll(".history-modal-row").forEach((row) => {
+    const matchesSearch = !searchValue || row.dataset.search?.includes(searchValue);
+    const matchesWaste = !wasteFilter || row.dataset.waste === wasteFilter;
+    row.classList.toggle("hidden", !(matchesSearch && matchesWaste));
+  });
+}
+
+async function predictWasteFromBlob(blob) {
+  const imageElement = await withTimeout(
+    loadImageFromBlob(blob),
+    8000,
+    "The selected image took too long to load."
+  );
+
+  if (wasteModel) {
+    const predictions = await withTimeout(
+      wasteModel.predict(imageElement),
+      10000,
+      "The custom model took too long to analyze this image."
+    );
+    return predictions.sort((left, right) => right.probability - left.probability)[0];
+  }
+
+  return predictWithDemoFallback(imageElement, blob);
+}
+
+async function saveDetectionFromBlob(blob, filename = "waste-image.jpg") {
+  const bestPrediction = await predictWasteFromBlob(blob);
+  if (!bestPrediction) {
+    throw new Error("The waste model did not return a prediction.");
+  }
+
+  const formData = new FormData();
+  formData.append("wasteImage", blob, filename);
+  formData.append("predictedLabel", bestPrediction.className);
+  formData.append("confidence", bestPrediction.probability);
+  formData.append(
+    "modelVersion",
+    usingDemoModel ? FALLBACK_MODEL_VERSION : window.intelliEcoModelConfig?.version || "1.0.0"
+  );
+
+  const response = await fetch("/api/detections/analyze", {
+    method: "POST",
+    body: formData
+  });
+
+  const result = await response.json();
+  if (!response.ok) {
+    throw new Error(result.message || "Analysis failed.");
+  }
+
+  return result;
+}
+
+async function searchRecyclingCenters(placeName, showAll = false) {
+  if (!placeName && !showAll) {
     setMapStatus("Enter an area name first.");
     finderResults?.classList.add("hidden");
     return;
@@ -522,43 +722,28 @@ async function searchRecyclingCenters(placeName) {
     return;
   }
 
-  setMapStatus("Searching nearby recycling centers...");
+  setMapStatus(showAll ? "Loading all center locations..." : "Searching center locations...");
 
   try {
-    const response = await fetch(`/api/recycling-centers?query=${encodeURIComponent(placeName)}`);
-    const data = await response.json();
+    const data = await fetchCenters(placeName, showAll);
+    mapMarkers = renderCentersOnMap(map, mapMarkers, data.centers);
 
-    if (!response.ok) {
-      throw new Error(data.message || "Location search failed.");
-    }
-
-    map.setView([data.location.lat, data.location.lon], 13);
-
-    mapMarkers.forEach((marker) => marker.remove());
-    mapMarkers = [];
-
-    data.centers.forEach((location) => {
-      const marker = L.marker([location.lat, location.lon])
-        .addTo(map)
-        .bindPopup(`<strong>${location.name}</strong><br/>${location.address}`);
-      mapMarkers.push(marker);
-    });
-
-    currentCenters = data.centers;
-    currentCenterLocation = data.location.name;
     updateRecyclingList(data.centers);
-    setMapStatus(
-      `${data.centers.length} recycling center${data.centers.length === 1 ? "" : "s"} found in ${data.location.name}.`
-    );
+    if (data.centers.length) {
+      setMapStatus(
+        showAll
+          ? `${data.centers.length} center location${data.centers.length === 1 ? "" : "s"} available.`
+          : `${data.centers.length} center${data.centers.length === 1 ? "" : "s"} found for ${placeName}.`
+      );
+    } else {
+      map.setView([data.location.lat, data.location.lon], 13);
+      setMapStatus(data.message || "No centers available in this area yet.");
+    }
     setTimeout(() => map?.invalidateSize(), 0);
   } catch (error) {
     console.error(error);
     finderResults?.classList.add("hidden");
-    finderActions?.classList.add("hidden");
-    currentCenters = [];
-    currentCenterLocation = "";
-    closeCentersModal();
-    setMapStatus(error.message || "Could not load recycling centers for that area right now.");
+    setMapStatus(error.message || "Could not load center locations right now.");
     recyclingList.innerHTML = "";
   }
 }
@@ -679,8 +864,8 @@ locationForm.addEventListener("submit", async (event) => {
   await searchRecyclingCenters(locationInput.value.trim());
 });
 
-seeAllCentersBtn?.addEventListener("click", () => {
-  openCentersModal();
+showAllCentersBtn?.addEventListener("click", async () => {
+  await openCentersModal();
 });
 
 closeCentersModalBtn?.addEventListener("click", () => {
@@ -691,28 +876,71 @@ centersModalBackdrop?.addEventListener("click", () => {
   closeCentersModal();
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeCentersModal();
+  }
+});
+
 pickupRequestForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const payload = {
-    wasteType: document.getElementById("pickupWasteType")?.value.trim(),
-    contactPhone: document.getElementById("pickupPhone")?.value.trim(),
-    areaName: document.getElementById("pickupArea")?.value.trim(),
-    addressLine: document.getElementById("pickupAddress")?.value.trim(),
-    latitude: document.getElementById("pickupLatitude")?.value.trim(),
-    longitude: document.getElementById("pickupLongitude")?.value.trim(),
-    notes: document.getElementById("pickupNotes")?.value.trim()
-  };
+  const pickupImage = pickupImageInput?.files?.[0];
+  const formData = new FormData();
+  let detectedItems = [];
+  let linkedDetections = [...selectedPreviousDetections];
 
-  pickupStatus.textContent = "Submitting pickup request...";
+  pickupStatus.textContent = pickupImage
+    ? "Analyzing pickup image before submitting..."
+    : "Submitting pickup request...";
 
   try {
+    if (pickupImage) {
+      const detection = await saveDetectionFromBlob(pickupImage, pickupImage.name || "pickup-waste.jpg");
+      linkedDetections = [detection];
+      pickupWasteTypeInput.value = detection.wasteType;
+      prependHistoryRow(detection);
+      fetchStats();
+    }
+
+    if (linkedDetections.length) {
+      detectedItems = groupDetectionsAsItems(linkedDetections);
+      setPickupDetectedItems(detectedItems);
+    } else if (pickupWasteTypeInput?.value.trim()) {
+      detectedItems = [
+        {
+          wasteType: pickupWasteTypeInput.value.trim(),
+          quantity: 1
+        }
+      ];
+    }
+
+    formData.append("wasteType", pickupWasteTypeInput?.value.trim() || linkedDetections[0]?.wasteType || "");
+    formData.append("approximateWeightKg", pickupWeightInput?.value || "");
+    formData.append("contactPhone", document.getElementById("pickupPhone")?.value.trim() || "");
+    formData.append("areaName", document.getElementById("pickupArea")?.value.trim() || "");
+    formData.append("addressLine", document.getElementById("pickupAddress")?.value.trim() || "");
+    formData.append("latitude", document.getElementById("pickupLatitude")?.value.trim() || "");
+    formData.append("longitude", document.getElementById("pickupLongitude")?.value.trim() || "");
+    formData.append("notes", document.getElementById("pickupNotes")?.value.trim() || "");
+    formData.append("detectedItems", JSON.stringify(detectedItems));
+
+    if (linkedDetections.length) {
+      formData.append(
+        "linkedDetectionIds",
+        JSON.stringify(linkedDetections.map((detection) => detection.id).filter(Boolean))
+      );
+      formData.append("linkedDetectionId", linkedDetections[0].id || "");
+      formData.append("imagePath", linkedDetections[0].imagePath || "");
+    }
+
+    if (pickupImage) {
+      formData.append("pickupImage", pickupImage);
+    }
+
     const response = await fetch("/api/pickup-requests", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     const result = await response.json();
@@ -723,11 +951,89 @@ pickupRequestForm?.addEventListener("submit", async (event) => {
     prependPickupRow(result.pickup);
     pickupRequestForm.reset();
     document.getElementById("pickupArea").value = "Kuril, Dhaka";
+    selectedPreviousDetections = [];
+    setPickupDetectedItems([]);
     pickupStatus.textContent =
       "Pickup request submitted successfully. Your reward will be added after pickup completion.";
   } catch (error) {
     console.error(error);
     pickupStatus.textContent = error.message || "Could not submit pickup request.";
+  }
+});
+
+previousDetectionSelect?.addEventListener("change", () => {
+  const option = previousDetectionSelect.selectedOptions[0];
+
+  if (!option?.value) {
+    selectedPreviousDetections = [];
+    setPickupDetectedItems([]);
+    return;
+  }
+
+  selectedPreviousDetections = [
+    {
+      id: option.value,
+      wasteType: option.dataset.wasteType,
+      imagePath: option.dataset.imagePath
+    }
+  ];
+
+  syncPickupFromSelectedDetections();
+});
+
+pickupImageInput?.addEventListener("change", () => {
+  if (pickupImageInput.files?.length) {
+    previousDetectionSelect.value = "";
+    selectedPreviousDetections = [];
+    setPickupDetectedItems([]);
+  }
+});
+
+openDetectionHistoryModalBtn?.addEventListener("click", () => {
+  openDetectionHistoryModal();
+});
+
+document.querySelectorAll("[data-close-history-modal]").forEach((element) => {
+  element.addEventListener("click", () => {
+    closeDetectionHistoryModal();
+  });
+});
+
+historyModalSearch?.addEventListener("input", () => {
+  filterDetectionHistoryModal();
+});
+
+historyWasteFilter?.addEventListener("change", () => {
+  filterDetectionHistoryModal();
+});
+
+applyHistorySelectionBtn?.addEventListener("click", () => {
+  const selectedCheckboxes = Array.from(
+    document.querySelectorAll(".history-select-checkbox:checked")
+  );
+
+  selectedPreviousDetections = selectedCheckboxes.map((checkbox) => ({
+    id: checkbox.value,
+    wasteType: checkbox.dataset.wasteType,
+    imagePath: checkbox.dataset.imagePath
+  }));
+
+  if (previousDetectionSelect) {
+    previousDetectionSelect.value =
+      selectedPreviousDetections.length === 1 ? selectedPreviousDetections[0].id : "";
+  }
+
+  if (pickupImageInput) {
+    pickupImageInput.value = "";
+  }
+
+  syncPickupFromSelectedDetections();
+  closeDetectionHistoryModal();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeDetectionHistoryModal();
   }
 });
 

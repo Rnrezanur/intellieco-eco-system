@@ -246,12 +246,182 @@ input {
   align-items: start;
 }
 
+.admin-hero {
+  background: linear-gradient(135deg, #183727 0%, #2f6f4c 58%, #f0b35b 100%);
+  color: #ffffff;
+  border-radius: 30px;
+  padding: 1.5rem;
+  box-shadow: 0 22px 55px rgba(24, 55, 39, 0.2);
+}
+
+.admin-hero p,
+.admin-hero .eyebrow,
+.admin-hero .panel-subtitle {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.admin-command-card {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: none;
+}
+
+.admin-summary-grid,
+.admin-analytics-grid {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.admin-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.admin-analytics-grid {
+  grid-template-columns: 1.1fr 1.1fr 0.8fr;
+  align-items: stretch;
+}
+
+.admin-summary-card {
+  background: #ffffff;
+  border: 1px solid rgba(211, 227, 212, 0.9);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  padding: 1.2rem;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-summary-card p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-summary-card strong {
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+}
+
+.admin-summary-card-alert {
+  background: linear-gradient(180deg, #fff6e8, #ffffff);
+  border-color: #efd2a8;
+}
+
+.summary-icon {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+  background: #edf6ed;
+  color: var(--accent-dark);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.admin-panel {
+  border-radius: 26px;
+}
+
+.detected-items-preview {
+  background: #f7fbf5;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.85rem 1rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.detected-item-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .section-heading,
 .history-header {
   display: flex;
   justify-content: space-between;
   align-items: start;
   gap: 1rem;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.see-more-btn {
+  white-space: nowrap;
+}
+
+.table-more-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 1rem;
+}
+
+.admin-list-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.admin-list-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 36, 26, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.admin-list-modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(211, 227, 212, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 26px 70px rgba(22, 50, 34, 0.22);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+.admin-list-modal-card-wide {
+  width: min(1120px, 100%);
+}
+
+.admin-list-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+  padding: 1.25rem 1.25rem 0.85rem;
+  border-bottom: 1px solid rgba(211, 227, 212, 0.8);
+}
+
+.admin-list-modal-header h2 {
+  margin: 0 0 0.35rem;
+}
+
+.admin-list-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto auto;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: #f8fbf7;
+  border-bottom: 1px solid rgba(211, 227, 212, 0.8);
+}
+
+.admin-list-modal-body {
+  overflow: auto;
+  padding: 0 1.25rem 1.25rem;
 }
 
 .stat-pill {
@@ -463,15 +633,22 @@ input {
   font-size: 0.95rem;
 }
 
+.finder-wide-button {
+  width: 100%;
+  margin: 0 0 0.85rem;
+}
+
 .finder-results {
   display: grid;
   gap: 0.9rem;
   align-items: start;
 }
 
-.finder-actions {
-  display: flex;
-  justify-content: flex-end;
+.finder-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+  gap: 1rem;
+  align-items: stretch;
 }
 
 .finder-map-wrap {
@@ -488,16 +665,43 @@ input {
 }
 
 .map-box {
-  min-height: 250px;
+  min-height: 360px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid var(--border);
   margin-bottom: 0;
 }
 
+.finder-side-panel {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 0.85rem;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.75rem;
+}
+
+.finder-side-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.finder-side-head strong {
+  background: var(--surface-2);
+  color: var(--accent-dark);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+}
+
 .recycling-list {
   display: grid;
   gap: 0.8rem;
+  align-content: start;
+  max-height: 318px;
+  overflow-y: auto;
 }
 
 .centers-modal {
@@ -519,8 +723,8 @@ input {
 .centers-modal-card {
   position: relative;
   z-index: 1;
-  width: min(760px, 100%);
-  max-height: min(80vh, 860px);
+  width: min(920px, 100%);
+  max-height: min(86vh, 860px);
   overflow: hidden;
   background: #ffffff;
   border: 1px solid rgba(211, 227, 212, 0.9);
@@ -543,6 +747,23 @@ input {
   margin: 0 0 0.35rem;
 }
 
+.modal-close-button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--text);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-map-box {
+  min-height: 520px;
+  width: 100%;
+}
+
 .centers-modal-list {
   overflow-y: auto;
   padding: 1.25rem;
@@ -554,6 +775,21 @@ input {
 .recycling-card {
   border: 1px solid rgba(211, 227, 212, 0.85);
   padding: 0.95rem 1rem;
+}
+
+.center-card {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.center-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 12px 28px rgba(47, 143, 91, 0.12);
 }
 
 .recycling-card-head {
@@ -693,6 +929,8 @@ input {
   .info-grid,
   .chart-grid,
   .metric-grid,
+  .admin-summary-grid,
+  .admin-analytics-grid,
   .model-card-grid {
     grid-template-columns: 1fr;
   }
@@ -706,8 +944,20 @@ input {
     grid-template-columns: 1fr;
   }
 
+  .finder-map-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-list-toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .centers-modal-card {
     max-height: 88vh;
+  }
+
+  .modal-map-box {
+    min-height: 420px;
   }
 }
 
