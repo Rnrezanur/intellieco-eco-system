@@ -8,6 +8,16 @@
       <% } else { %>
         <a href="/dashboard">Dashboard</a>
       <% } %>
+      <a href="/profile" class="user-menu-link" aria-label="Open profile settings">
+        <span class="user-avatar">
+          <% if (currentUser.profileImage) { %>
+            <img src="<%= currentUser.profileImage %>" alt="<%= currentUser.name || "User" %> profile picture" />
+          <% } else { %>
+            <%= (currentUser.name || currentUser.email || "U").charAt(0).toUpperCase() %>
+          <% } %>
+        </span>
+        <span class="user-menu-name"><%= currentUser.name || "Profile" %></span>
+      </a>
       <form action="/auth/logout" method="POST">
         <button type="submit" class="ghost-button">Logout</button>
       </form>

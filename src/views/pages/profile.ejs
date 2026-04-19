@@ -1,0 +1,95 @@
+<%- include("../partials/head") %>
+<%- include("../partials/navbar") %>
+
+<main class="dashboard-page profile-page">
+  <%- include("../partials/flash") %>
+
+  <section class="dashboard-header profile-header">
+    <div>
+      <span class="eyebrow">Account settings</span>
+      <h1>My Profile</h1>
+      <p>Update your account details and keep your IntelliEco profile information current.</p>
+    </div>
+    <div class="tip-card profile-summary-card">
+      <span class="profile-avatar-large">
+        <% if (profileUser.profileImage) { %>
+          <img src="<%= profileUser.profileImage %>" alt="<%= profileUser.name %> profile picture" />
+        <% } else { %>
+          <%= (profileUser.name || profileUser.email || "U").charAt(0).toUpperCase() %>
+        <% } %>
+      </span>
+      <div>
+        <h2><%= profileUser.name %></h2>
+        <p class="panel-subtitle"><%= profileUser.email %></p>
+      </div>
+      <div class="model-card-grid">
+        <div class="model-card-item">
+          <span>Role</span>
+          <strong><%= profileUser.role %></strong>
+        </div>
+        <div class="model-card-item">
+          <span>Reward Points</span>
+          <strong><%= profileUser.rewardPoints || 0 %></strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="profile-grid">
+    <article class="panel profile-card">
+      <h2>Update Profile</h2>
+      <p class="panel-subtitle">Your name appears on pickup requests, detections, and admin records.</p>
+
+      <form action="/profile" method="POST" enctype="multipart/form-data" class="auth-form profile-form">
+        <label>
+          Profile Picture
+          <input type="file" name="profileImage" accept="image/*" />
+        </label>
+
+        <label>
+          Full Name
+          <input type="text" name="name" value="<%= profileUser.name %>" required />
+        </label>
+
+        <label>
+          Email
+          <input type="email" name="email" value="<%= profileUser.email %>" required />
+        </label>
+
+        <div class="profile-password-box">
+          <h3>Password Change</h3>
+          <p class="panel-subtitle">Leave these fields empty if you only want to update your name or email.</p>
+
+          <label>
+            Current Password
+            <input type="password" name="currentPassword" autocomplete="current-password" />
+          </label>
+
+          <label>
+            New Password
+            <input type="password" name="newPassword" autocomplete="new-password" />
+          </label>
+        </div>
+
+        <button type="submit" class="button">Save Profile</button>
+      </form>
+    </article>
+
+    <aside class="tip-card profile-help-card">
+      <h2>Account Snapshot</h2>
+      <div class="model-card-grid profile-snapshot-grid">
+        <div class="model-card-item">
+          <span>Rewarded Pickups</span>
+          <strong><%= profileUser.totalRewardedPickups || 0 %></strong>
+        </div>
+        <div class="model-card-item">
+          <span>Member Since</span>
+          <strong><%= profileUser.createdAt ? new Date(profileUser.createdAt).toLocaleDateString() : "New" %></strong>
+        </div>
+      </div>
+      <p class="tip-copy">Profile changes update your current login session immediately.</p>
+    </aside>
+  </section>
+</main>
+
+<%- include("../partials/footer") %>

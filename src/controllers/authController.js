@@ -134,7 +134,8 @@ async function login(req, res) {
       id: user._id,
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      profileImage: user.profileImage
     };
 
     return res.redirect(user.role === "admin" ? "/admin" : "/dashboard");

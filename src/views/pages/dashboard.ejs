@@ -94,29 +94,53 @@
       <div class="finder-top">
         <div>
           <h2>Find Center</h2>
-          <p class="panel-subtitle">Search by area or view every available waste collection center on the map.</p>
+          <p class="panel-subtitle">Search or view the center map.</p>
+        </div>
+        <span class="status-badge finder-active-badge">Active Center</span>
+      </div>
+
+      <div class="finder-active-card">
+        <span class="finder-active-icon" aria-hidden="true">⌖</span>
+        <div>
+          <strong>Kuril&ndash;Khilkhet, Dhaka</strong>
+          <p>Available for pickup and drop-off.</p>
         </div>
       </div>
 
       <form id="locationForm" class="finder-search">
         <div class="finder-search-field">
           <label for="locationInput">Area</label>
-          <input
-            type="text"
-            id="locationInput"
-            placeholder="Example: Kuril or Khilkhet"
-            required
-          />
+          <div class="finder-input-wrap">
+            <span aria-hidden="true">⌕</span>
+            <input
+              type="text"
+              id="locationInput"
+              placeholder="Example: Kuril or Khilkhet"
+              required
+            />
+          </div>
         </div>
-        <button type="submit" class="button">Search Map</button>
+        <div class="finder-actions">
+          <button type="submit" class="button finder-primary-btn">
+            <span aria-hidden="true">⌕</span>
+            Search Map
+          </button>
+          <button type="button" id="showAllCentersBtn" class="button-secondary finder-secondary-btn">
+            <span aria-hidden="true">▣</span>
+            See All Centers
+          </button>
+        </div>
       </form>
-      <button type="button" id="showAllCentersBtn" class="ghost-button finder-wide-button">
-        See All Center Locations
+
+      <button type="button" id="finderPreviewBtn" class="finder-preview" aria-label="Open all center locations map">
+        <span class="finder-preview-grid"></span>
+        <span class="finder-preview-pin"></span>
+        <span class="finder-preview-label">Map Preview</span>
       </button>
 
       <div class="finder-status-shell">
         <p id="mapStatus" class="status-text finder-status">
-          Search an area or view all center locations. Current available center: Kuril-Khilkhet, Dhaka.
+          Search Kuril or Khilkhet to show the center.
         </p>
       </div>
 
@@ -385,14 +409,33 @@
   <section class="centers-modal-card" role="dialog" aria-modal="true" aria-labelledby="centersModalTitle">
     <div class="centers-modal-header">
       <div>
+        <span class="eyebrow">Collection map</span>
         <h2 id="centersModalTitle">All Center Locations</h2>
-        <p class="panel-subtitle">Available center: Kuril-Khilkhet, Dhaka.</p>
+        <p class="panel-subtitle">Currently available center: Kuril&ndash;Khilkhet, Dhaka.</p>
       </div>
       <button type="button" id="closeCentersModalBtn" class="modal-close-button" aria-label="Close all centers map">
         &times;
       </button>
     </div>
-    <div id="allCentersMap" class="modal-map-box"></div>
+    <div class="centers-modal-body">
+      <div class="modal-map-shell">
+        <div id="allCentersMap" class="modal-map-box"></div>
+      </div>
+      <aside class="modal-center-panel">
+        <span class="mini-badge">Active Center</span>
+        <h3>Kuril&ndash;Khilkhet Collection Center</h3>
+        <p>Dhaka, Bangladesh</p>
+        <div class="modal-center-meta">
+          <span>Area</span>
+          <strong>Kuril&ndash;Khilkhet</strong>
+        </div>
+        <div class="modal-center-meta">
+          <span>Status</span>
+          <strong>Available</strong>
+        </div>
+        <p class="tip-copy">More collection centers can be added later without changing this layout.</p>
+      </aside>
+    </div>
   </section>
 </div>
 

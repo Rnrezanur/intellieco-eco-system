@@ -46,6 +46,22 @@ async function dashboardPage(req, res) {
   });
 }
 
+async function profilePage(req, res) {
+  const profileUser = await User.findById(req.session.user.id).select(
+    "name email role profileImage rewardPoints totalRewardedPickups createdAt"
+  );
+
+  if (!profileUser) {
+    req.flash("error", "Please log in again to update your profile.");
+    return res.redirect("/login");
+  }
+
+  res.render("pages/profile", {
+    title: "My Profile | IntelliEco",
+    profileUser
+  });
+}
+
 async function adminPage(req, res) {
   const [
     recentDetections,
@@ -107,6 +123,7 @@ module.exports = {
   registerPage,
   verifyAccountPage,
   dashboardPage,
+  profilePage,
   adminPage,
   forgotPasswordPage,
   resetPasswordPage

@@ -16,6 +16,7 @@ const mapStatus = document.getElementById("mapStatus");
 const recyclingList = document.getElementById("recyclingList");
 const finderResults = document.getElementById("finderResults");
 const showAllCentersBtn = document.getElementById("showAllCentersBtn");
+const finderPreviewBtn = document.getElementById("finderPreviewBtn");
 const centerCountLabel = document.getElementById("centerCountLabel");
 const centersModal = document.getElementById("centersModal");
 const centersModalBackdrop = document.getElementById("centersModalBackdrop");
@@ -431,15 +432,33 @@ function ensureAllCentersMap() {
   }).addTo(allCentersMap);
 }
 
+function getCenterMarkerIcon() {
+  if (typeof L === "undefined") {
+    return undefined;
+  }
+
+  return L.divIcon({
+    className: "center-marker-icon",
+    html: "<span></span>",
+    iconSize: [34, 42],
+    iconAnchor: [17, 42],
+    popupAnchor: [0, -36]
+  });
+}
+
 function renderCentersOnMap(targetMap, markers, centers) {
   markers.forEach((marker) => marker.remove());
   const nextMarkers = [];
+  const markerIcon = getCenterMarkerIcon();
+  const markerOptions = markerIcon ? { icon: markerIcon } : {};
 
   centers.forEach((location) => {
-    const marker = L.marker([location.lat, location.lon])
+    const marker = L.marker([location.lat, location.lon], markerOptions)
       .addTo(targetMap)
       .bindPopup(
-        `<strong>${location.name}</strong><br/>Area: ${location.area}<br/>Status: ${location.status}<br/>${location.address}`
+        `<strong>${location.name}</strong><br/>Area: ${location.area}<br/>Status: ${
+          location.status || "Available"
+        }<br/>${location.address || "Dhaka, Bangladesh"}`
       );
     nextMarkers.push(marker);
   });
@@ -480,13 +499,14 @@ async function openCentersModal() {
   centersModal.classList.remove("hidden");
   centersModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("modal-open");
+  closeCentersModalBtn?.focus({ preventScroll: true });
   ensureAllCentersMap();
 
   if (!allCentersMap) {
     return;
   }
 
-  setTimeout(() => allCentersMap?.invalidateSize(), 0);
+  setTimeout(() => allCentersMap?.invalidateSize(), 80);
 
   try {
     const data = await fetchCenters("", true);
@@ -865,6 +885,10 @@ locationForm.addEventListener("submit", async (event) => {
 });
 
 showAllCentersBtn?.addEventListener("click", async () => {
+  await openCentersModal();
+});
+
+finderPreviewBtn?.addEventListener("click", async () => {
   await openCentersModal();
 });
 
